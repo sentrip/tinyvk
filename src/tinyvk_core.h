@@ -81,6 +81,16 @@ using fixed_vector = TINYVK_FIXED_VECTOR(T, N);
 template<typename T>
 using span = TINYVK_SPAN(T);
 
+using tinystd::i8;
+using tinystd::i16;
+using tinystd::i32;
+using tinystd::i64;
+using tinystd::u8;
+using tinystd::u16;
+using tinystd::u32;
+using tinystd::u64;
+using tinystd::size_t;
+using tinystd::ibool;
 
 using vk_alloc = const VkAllocationCallbacks*;
 

@@ -373,7 +373,7 @@ physical_devices::pick_best(
         vkGetPhysicalDeviceFeatures(device, &features);
         vkGetPhysicalDeviceProperties(device, &properties);
 
-        u32 rating{};
+        u32 rating{1};
         if ((use_gpu && properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
             || (!use_gpu && properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU))
         {

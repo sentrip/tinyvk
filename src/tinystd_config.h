@@ -14,6 +14,10 @@
 #error TinyVk does not support this platform yet
 #endif
 
+#define NODISCARD [[nodiscard]]
+
+namespace tinystd {
+
 using i8        = signed char;
 using i16       = short;
 using i32       = int;
@@ -25,6 +29,6 @@ using u64       = unsigned long long;
 using size_t    = unsigned long long;
 using ibool     = u32;
 
-#define NODISCARD [[nodiscard]]
+}
 
 #endif //TINYSTD_CONFIG_H
