@@ -25,13 +25,21 @@ struct span {
 
     constexpr bool        empty()               const noexcept { return m_size == 0; }
     constexpr size_t      size()                const noexcept { return m_size; }
+    template<typename = void>
     constexpr T*          data()                      noexcept { return m_data; }
+    template<typename = enable_if_t<!is_const_v<T>, void>>
     constexpr const T*    data()                const noexcept { return m_data; }
+    template<typename = void>
     constexpr T*          begin()                     noexcept { return m_data; }
+    template<typename = void>
     constexpr T*          end()                       noexcept { return m_data + m_size; }
+    template<typename = enable_if_t<!is_const_v<T>, void>>
     constexpr const T*    begin()               const noexcept { return m_data; }
+    template<typename = enable_if_t<!is_const_v<T>, void>>
     constexpr const T*    end()                 const noexcept { return m_data + m_size; }
+    template<typename = void>
     constexpr T&          operator[](size_t i)        noexcept { return m_data[i]; }
+    template<typename = enable_if_t<!is_const_v<T>, void>>
     constexpr const T&    operator[](size_t i)  const noexcept { return m_data[i]; }
 };
 

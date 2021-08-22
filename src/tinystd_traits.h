@@ -14,7 +14,7 @@ struct void_t {  };
 
 
 template <bool Test, class T = void>
-struct enable_if {};
+struct enable_if { struct unique{}; using type = unique; };
 
 template <class T>
 struct enable_if<true, T> { using type = T; };

@@ -50,7 +50,7 @@
 #endif
 
 #ifndef TINYVK_DEFAULT_TIMEOUT_NANOSECONDS
-#define TINYVK_DEFAULT_TIMEOUT_NANOSECONDS  1'000'000'000
+#define TINYVK_DEFAULT_TIMEOUT_NANOSECONDS  1000000000
 #endif
 
 #ifndef TINYVK_PIPELINE_CACHE_PATH_MAX_SIZE
@@ -134,6 +134,7 @@ constexpr const char* vk_result_name(VkResult r)
         case VK_ERROR_VALIDATION_FAILED_EXT     : return "VK_ERROR_VALIDATION_FAILED_EXT";
         default                                 : return "VK_ERROR_UNKNOWN";
     }
+    return "VK_ERROR_UNKNOWN";
 }
 
 
