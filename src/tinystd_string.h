@@ -42,6 +42,10 @@ struct sized_string : string_base<N> {
         *end() = 0;
     }
 
+    sized_string(const sized_string& o) : sized_string() { *this = o; }
+
+    sized_string(sized_string&& o) noexcept : sized_string() { *this = move(o); }
+
     sized_string& operator=(const sized_string& o)
     {
         m_size = o.m_size;
@@ -68,16 +72,6 @@ struct sized_string : string_base<N> {
         }
         o.m_size = 0;
         return *this;
-    }
-
-    sized_string(const sized_string& o)
-    {
-        *this = o;
-    }
-
-    sized_string(sized_string&& o) noexcept
-    {
-        *this = move(o);
     }
 
 private:

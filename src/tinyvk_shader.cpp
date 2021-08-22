@@ -100,12 +100,13 @@ compile_shader_glslangvalidator(
 
     size_t nread{};
     char buf[1024]{};
-    fopen_s(&file, output_name.data(), "r");
+    fopen_s(&file, output_name.data(), "rb");
     if (file) {
         if (success) {
             while ((nread = fread(buf, 1, sizeof(buf), file)) > 0) {
-                binary.resize(binary.size() + nread);
-                tinystd::memcpy(binary.end(), buf, nread);
+                const size_t i = binary.size();
+                binary.resize(binary.size() + nread/sizeof(u32));
+                tinystd::memcpy(binary.data() + i, buf, nread);
             }
         }
         fclose(file);

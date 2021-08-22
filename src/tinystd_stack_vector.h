@@ -68,8 +68,8 @@ struct stack_vector {
         m_size = n;
     }
 
-    stack_vector(const stack_vector& o) { *this = o; }
-    stack_vector(stack_vector&& o) noexcept { *this = (stack_vector&&)o; }
+    stack_vector(const stack_vector& o) : stack_vector() { *this = o; }
+    stack_vector(stack_vector&& o) noexcept : stack_vector() { *this = move(o); }
 
     stack_vector& operator=(const stack_vector& o)
     {
