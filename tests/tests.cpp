@@ -84,78 +84,6 @@ namespace tinyvk {
 
 
 
-#include <shaderc/shaderc.hpp>
-
-
-namespace tinyvk {
-
-using shader_binary = small_vector<u32, 1024>;
-
-
-enum shader_stage_t {
-    SHADER_VERTEX,
-    SHADER_FRAGMENT,
-    SHADER_COMPUTE,
-    SHADER_GEOMETRY,
-    SHADER_TESS_CTRL,
-    SHADER_TESS_EVAL,
-    MAX_SHADER_COUNT
-};
-
-enum shader_optimization_t {
-    SHADER_OPTIMIZATION_NONE,
-    SHADER_OPTIMIZATION_SIZE,
-    SHADER_OPTIMIZATION_SPEED,
-};
-
-
-struct shader_macro {
-    const char* define{}, *value{};
-};
-
-
-shader_binary
-compile_shader(
-        shader_stage_t              stage,
-        span<const char>            src_code,
-        span<const shader_macro>    macros = {},
-        shader_optimization_t       opt_level = SHADER_OPTIMIZATION_NONE)
-{
-    shader_binary binary;
-
-    shaderc_shader_kind kind{};
-    if (stage == SHADER_VERTEX)     kind = shaderc_vertex_shader;
-    if (stage == SHADER_FRAGMENT)   kind = shaderc_fragment_shader;
-    if (stage == SHADER_COMPUTE)    kind = shaderc_compute_shader;
-    if (stage == SHADER_GEOMETRY)   kind = shaderc_geometry_shader;
-    if (stage == SHADER_TESS_CTRL)  kind = shaderc_tess_control_shader;
-    if (stage == SHADER_TESS_EVAL)  kind = shaderc_tess_evaluation_shader;
-
-    shaderc::Compiler compiler;
-    shaderc::CompileOptions options;
-
-    for (auto& macro: macros)
-        options.AddMacroDefinition(macro.define, macro.value);
-
-    options.SetOptimizationLevel(shaderc_optimization_level(opt_level));
-
-    auto module = compiler.CompileGlslToSpv(src_code.data(), kind, "tinyvk_compilation", options);
-
-    if (module.GetCompilationStatus() == shaderc_compilation_status_success) {
-        binary.resize(module.cend() - module.cbegin());
-        tinystd::memcpy(binary.data(), module.cbegin(), binary.size() * sizeof(u32));
-    }
-    else {
-        auto msg = module.GetErrorMessage();
-        tinystd::error("tinyvk::compile_shader failed: %s\n", msg.c_str());
-    }
-
-    return binary;
-}
-
-}
-
-
 #define CATCH_CONFIG_RUNNER
 #include "catch.hpp"
 
@@ -169,7 +97,7 @@ compile_shader(
 
 using namespace tinyvk;
 
-TEST_CASE("Vulkan device/queue selection", "[GPU]")
+TEST_CASE("Scratch test", "[GPU]")
 {
 #ifdef DISPLAY
     // Window
@@ -227,17 +155,6 @@ TEST_CASE("Vulkan device/queue selection", "[GPU]")
     tinyvk::swapchain::images images{};
     auto swapchain = tinyvk::swapchain::create(device, physical_device, surface, images, {{800, 600}});
 #endif
-
-//    u8 stuff[8]{1,2,3,4};
-//    auto h = tinyvk::pipeline_cache_header::create(physical_device, stuff);
-//    tinystd::print("Pipeline cache valid: %u\n", h.valid(physical_device, stuff));
-
-    static constexpr const char* SRC = R"(
-#version 450
-void main() {}
-)";
-    tinyvk::compile_shader(tinyvk::SHADER_COMPUTE, {SRC, strlen(SRC)});
-
 
     // Draw stuff
 

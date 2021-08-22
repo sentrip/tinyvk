@@ -37,7 +37,7 @@ struct sized_string : string_base<N> {
     {
         if (N == 0) ensure_capacity(m_capacity + n, true);
         else        tassert(m_size + n <= m_capacity && "String too long");
-        memcpy(end(), s, n);
+        if (s != end()) memcpy(end(), s, n);
         m_size += n;
         *end() = 0;
     }
