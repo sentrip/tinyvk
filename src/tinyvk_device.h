@@ -556,6 +556,20 @@ device::destroy(
 
 //region debug_messenger
 
+static ibool is_bugged_message(debug_messenger::callback_data data)
+{
+    /*** This seems to happen after creating render passes followed by reusing old (but still valid) render passes
+    vkCmdDraw(): RenderPasses incompatible between active render pass w/ VkRenderPass 0x9fe8bd0000000038[] with a
+        subpassCount of 1 and pipeline state object w/ VkRenderPass 0x9934aa000000004f[] with a subpassCount of 2.
+        The Vulkan spec states: The current render pass must be compatible with the renderPass member of the
+        VkGraphicsPipelineCreateInfo structure specified when creating the VkPipeline bound to VK_PIPELINE_BIND_POINT_GRAPHICS.
+        https://www.khronos.org/registry/vulkan/specs/1.1-extensions/html/vkspec.html#VUID-vkCmdDraw-renderPass-02684
+    */
+    if (data->pMessageIdName && str_equal(data->pMessageIdName, "VUID-vkCmdDraw-renderPass-02684"))
+        return true;
+    return false;
+}
+
 debug_messenger
 debug_messenger::create(
         VkInstance instance,
@@ -599,6 +613,9 @@ debug_messenger::callback* debug_messenger::default_callback = [](
         void*)
 {
     if (data->pMessageIdName || data->pMessage) {
+        if (is_bugged_message(data))
+            return u32(0);
+
         auto print_func = u32(severity) >= u32(DEBUG_SEVERITY_WARNING) ? tinystd::error : tinystd::print;
 
         print_func("VULKAN (%d)", data->messageIdNumber);
