@@ -4,7 +4,9 @@
 
 #include "tinyvk_shader.h"
 #include "tinystd_string.h"
+#include "tinystd_algorithm.h"
 
+#include <cstring>
 #include <shaderc/shaderc.hpp>
 
 namespace tinyvk {
@@ -75,8 +77,9 @@ compile_shader_glslangvalidator(
     shader_binary binary;
 
     tinystd::small_string<512> input_name{};
-    tmpnam_s<513>(input_name.m_data);
-    input_name.append(input_name.end(), strlen(input_name.data()));
+    static tinystd::monotonic_increasing_string<16> tmp_name{};
+    auto tmp = tmp_name.inc();
+    input_name.append(tmp.data(), tmp.size());
     if (stage == SHADER_VERTEX)     input_name.append(".vert", 5);
     if (stage == SHADER_FRAGMENT)   input_name.append(".frag", 5);
     if (stage == SHADER_COMPUTE)    input_name.append(".comp", 5);
@@ -88,8 +91,7 @@ compile_shader_glslangvalidator(
     output_name.append(input_name.data(), input_name.size());
     output_name.append(".bin", 4);
 
-    FILE *file{};
-    fopen_s(&file, input_name.data(), "w");
+    FILE *file = fopen(input_name.data(), "w");
     if (!file)
         return binary;
     fwrite(src_code.data(), 1, src_code.size(), file);
@@ -100,7 +102,7 @@ compile_shader_glslangvalidator(
 
     size_t nread{};
     char buf[1024]{};
-    fopen_s(&file, output_name.data(), "rb");
+    file = fopen(output_name.data(), "rb");
     if (file) {
         if (success) {
             while ((nread = fread(buf, 1, sizeof(buf), file)) > 0) {
@@ -186,7 +188,7 @@ compile_shader_glslangvalidator_files(
         char buf[1024];
         FILE *file;
         size_t nread;
-        fopen_s(&file, log_name.data(), "r");
+        file = fopen(log_name.data(), "r");
         if (file) {
             while ((nread = fread(buf, 1, sizeof(buf), file)) > 0)
                 fwrite(buf, 1, nread, stderr);

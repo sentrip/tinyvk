@@ -219,6 +219,23 @@ inline u32 hash_crc32(span<const u8> data)
    return ~crc;
 }
 
+template<size_t N = 16>
+struct monotonic_increasing_string {
+    size_t  index{};
+    u8      bytes[N]{};
+    char    string[N]{};
+
+    constexpr span<const char> inc() noexcept
+    {
+        if (++bytes[index] > ('z' - 'a')) {
+            for (size_t i = 0; i <= index; ++i) { bytes[i] = 0; string[i] = 'a'; }
+            ++index;
+        }
+        string[index] = 'a' + bytes[index];
+        string[index + 1] = 0;
+        return {string, index + 1};
+    }
+};
 
 }
 
