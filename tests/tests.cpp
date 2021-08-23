@@ -39,6 +39,7 @@ namespace tinyvk {
 #include "tinyvk_command.h"
 #include "tinyvk_pipeline_cache.h"
 #include "tinyvk_descriptor.h"
+#include "tinyvk_shader.h"
 
 
 
@@ -60,7 +61,7 @@ enum buffer_usage_t {
     BUFFER_INDEX = 0x00000040,
     BUFFER_VERTEX = 0x00000080,
     BUFFER_INDIRECT = 0x00000100,
-    BUFFER_RAY_TRACING_NV = 0x00000400,
+    BUFFER_RAY_TRACING = 0x00000400,
 };
 DEFINE_ENUM_FLAG(buffer_usage_t)
 

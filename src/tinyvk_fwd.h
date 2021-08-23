@@ -45,6 +45,7 @@ struct pipeline_cache_header;
 
 /// tinyvk_shader.h
 struct shader_macro;
+struct shader_module;
 
 }
 
