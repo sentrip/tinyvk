@@ -57,6 +57,14 @@
 #define TINYVK_PIPELINE_CACHE_PATH_MAX_SIZE 256
 #endif
 
+
+#define DEFINE_ENUM_FLAG(ENUM_TYPE)                                                                        \
+	static inline ENUM_TYPE operator|(ENUM_TYPE a, ENUM_TYPE b) { return (ENUM_TYPE)((uint32_t)(a) | (uint32_t)(b)); } \
+	static inline ENUM_TYPE operator&(ENUM_TYPE a, ENUM_TYPE b) { return (ENUM_TYPE)((uint32_t)(a) & (uint32_t)(b)); } \
+	static inline ENUM_TYPE operator|=(ENUM_TYPE& a, ENUM_TYPE b) { return a = (a | b); }                      \
+	static inline ENUM_TYPE operator&=(ENUM_TYPE& a, ENUM_TYPE b) { return a = (a & b); }
+
+
 namespace tinyvk {
 
 enum {
@@ -105,6 +113,28 @@ enum shader_stage_t {
     SHADER_TESS_EVAL = 0x20,
     SHADER_ALL = 0xff
 };
+
+
+/// see vk_mem_alloc.h for details
+enum vma_usage_t {
+    VMA_USAGE_UNKNOWN = 0,
+    VMA_USAGE_GPU_ONLY = 1,
+    VMA_USAGE_CPU_ONLY = 2,
+    VMA_USAGE_CPU_TO_GPU = 3,
+    VMA_USAGE_GPU_TO_CPU = 4,
+    VMA_USAGE_CPU_COPY = 5,
+};
+
+
+/// see vk_mem_alloc.h for details
+enum vma_create_t {
+    VMA_CREATE_DEDICATED_MEMORY = 0x00000001,
+    VMA_CREATE_MAPPED = 0x00000004,
+    VMA_CREATE_STRATEGY_BEST_FIT  = 0x00010000,
+    VMA_CREATE_STRATEGY_MIN_FRAGMENTATION = 0x00020000,
+    VMA_CREATE_STRATEGY_FASTEST = 0x00040000,
+};
+DEFINE_ENUM_FLAG(vma_create_t)
 
 
 template<typename Derived, typename VkType>

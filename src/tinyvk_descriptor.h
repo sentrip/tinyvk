@@ -37,7 +37,7 @@ struct descriptor {
 
 
 struct descriptor_pool_size {
-    u32     count{};
+    u32     count{64};
     float   sizes[MAX_DESCRIPTOR_COUNT]{1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
                                         1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f};
 };
@@ -202,7 +202,7 @@ descriptor_pool::create(
     pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 
     vk_validate(vkCreateDescriptorPool(device, &pool_info, alloc, &pool.vk),
-              "tinyvk::descriptor_pool::descriptor_pool - Failed to create descriptor pool");
+              "tinyvk::descriptor_pool::create - Failed to create descriptor pool");
 
     return pool;
 }
@@ -232,7 +232,7 @@ descriptor_set_layout descriptor_set_layout::create(
     layout_info.bindingCount = u32(bindings.size());
     layout_info.pBindings = (const VkDescriptorSetLayoutBinding*)bindings.data();
     vk_validate(vkCreateDescriptorSetLayout(device, &layout_info, alloc, &layout.vk),
-              "tinyvk::descriptor_set_layout::descriptor_set_layout - Failed to create descriptor set layout");
+              "tinyvk::descriptor_set_layout::create - Failed to create descriptor set layout");
 
     return layout;
 }

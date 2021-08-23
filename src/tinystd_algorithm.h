@@ -39,6 +39,12 @@ constexpr const T& max(const T& l, const T& r)
     return l < r ? r : l;
 }
 
+template<typename T>
+constexpr T round_up(T value, T multiple)
+{
+    return ((value + multiple - T(1)) / multiple) * multiple;
+}
+
 
 template<typename It, typename T>
 constexpr It find(It begin, It end, const T& v)
