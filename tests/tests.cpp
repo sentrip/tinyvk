@@ -239,16 +239,17 @@ TEST_CASE("Scratch test", "[GPU]")
     auto buf = buffer::create(vma_alloc, &a, {512});
 
     descriptor_pool_allocator alloc;
+    alloc.init(device, {});
     descriptor_set_layout_cache cache;
     descriptor_set_builder build{alloc};
 
     VkDescriptorSet set{};
     VkDescriptorBufferInfo bi{buf, 0, -1ull};
     build.bind_buffers(0, {&bi, 1}, DESCRIPTOR_STORAGE_BUFFER);
-    build.build(device, {&set, 1}, {}, {});
+    build.build(device, {&set, 1}, &cache, {});
 
     alloc.destroy(device);
-//    cache.destroy(device);
+    cache.destroy(device);
     buf.destroy(vma_alloc, a);
 
     //  Cleanup

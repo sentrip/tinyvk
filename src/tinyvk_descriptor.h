@@ -79,7 +79,7 @@ struct descriptor_pool_allocator {
     void                    init(
             VkDevice                device,
             descriptor_pool_size    size = {},
-            u32                     set_count = 1024,
+            u32                     set_count = 64,
             vk_alloc                alloc = {});
 
     void                    destroy(
@@ -104,12 +104,24 @@ struct descriptor_set_layout_cache {
 
     small_vector<u64, N>                    m_layout_hashes{};
     small_vector<VkDescriptorSetLayout, N>  m_layouts{};
+    bitset<N>                               m_in_use{};
 
     VkDescriptorSetLayout   create(
             VkDevice                device,
             span<const descriptor>  bindings,
             ibool*                  is_new = {},
             vk_alloc                alloc = {});
+
+    void                    destroy(
+            VkDevice                device,
+            vk_alloc                alloc = {});
+
+    void                    destroy_unused(
+            VkDevice                device,
+            vk_alloc                alloc = {});
+
+    void                    use(
+            VkDescriptorSetLayout   layout);
 };
 
 
@@ -289,6 +301,8 @@ descriptor_pool_allocator::allocate(
         ibool new_pool,
         vk_alloc alloc)
 {
+    tassert(m_current_pool && "Did not call descriptor_pool_allocator::init()");
+
     if (new_pool) {
         m_current_pool = descriptor_pool::create(device, m_set_count, m_size);
         m_used_pools.push_back(m_current_pool);
@@ -350,7 +364,50 @@ descriptor_set_layout_cache::create(
     }
 
     if (is_new) *is_new = true;
-    return descriptor_set_layout::create(device, bindings, alloc);
+    auto layout = descriptor_set_layout::create(device, bindings, alloc);
+    m_layouts.push_back(layout);
+    m_layout_hashes.push_back(h);
+    return layout;
+}
+
+
+void
+descriptor_set_layout_cache::destroy(
+        VkDevice device,
+        vk_alloc alloc)
+{
+    for (auto layout: m_layouts)
+        vkDestroyDescriptorSetLayout(device, layout, alloc);
+    m_layouts.clear();
+    m_layout_hashes.clear();
+    m_in_use.reset();
+}
+
+
+void
+descriptor_set_layout_cache::destroy_unused(
+        VkDevice device,
+        vk_alloc alloc)
+{
+    for (u32 i = 0; i < m_layouts.size(); ++i) {
+        if (!m_in_use.test(i)) {
+            vkDestroyDescriptorSetLayout(device, m_layouts[i], alloc);
+            m_layouts[i] = m_layouts.pop_back();
+            m_layout_hashes[i] = m_layout_hashes.pop_back();
+            m_in_use.set(i, m_in_use.test(m_layouts.size()));
+            m_in_use.reset(m_layouts.size());
+        }
+    }
+}
+
+
+void
+descriptor_set_layout_cache::use(
+        VkDescriptorSetLayout layout)
+{
+    auto it = tinystd::find(m_layouts.begin(), m_layouts.end(), layout);
+    if (it != m_layouts.end())
+        m_in_use.set(it - m_layouts.begin());
 }
 
 //endregion

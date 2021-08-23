@@ -16,6 +16,7 @@ struct bitset {
     [[nodiscard]] constexpr bool test  (size_t i)          const noexcept { return (words[i / N] & (1ull << (i % N))) > 0; }
                   constexpr void set   (size_t i, bool v = true) noexcept { words[i / N] |= (uint64_t(v) << (i % N)); }
                   constexpr void reset (size_t i)                noexcept { words[i / N] &= ~(1ull << (i % N)); }
+                  constexpr void reset ()                        noexcept { for (auto& w: words) w = 0; }
 };
 
 }
