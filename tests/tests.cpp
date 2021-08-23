@@ -91,6 +91,9 @@ TEST_CASE("Scratch test", "[GPU]")
 #endif
 
     // Draw stuff
+    tinystd::monotonic_increasing_string<16> x;
+    for (int i = 0; i < 100; ++i)
+        tinystd::print("%s\n", x.inc().data());
 
     //  Cleanup
 #ifdef DISPLAY

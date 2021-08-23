@@ -222,17 +222,20 @@ inline u32 hash_crc32(span<const u8> data)
 template<size_t N = 16>
 struct monotonic_increasing_string {
     size_t  index{};
-    u8      bytes[N]{};
-    char    string[N]{};
+    char    string[N]{'a'};
 
     constexpr span<const char> inc() noexcept
     {
-        if (++bytes[index] > ('z' - 'a')) {
-            for (size_t i = 0; i <= index; ++i) { bytes[i] = 0; string[i] = 'a'; }
-            ++index;
+        if (++string[index] > 'z') {
+            --string[index];
+            u32 to_flip = ++index;
+            string[index] = 'a';
+            while (to_flip) {
+                string[to_flip - 1] = 'a';
+                if (string[--to_flip] != 'z')
+                    break;
+            }
         }
-        string[index] = 'a' + bytes[index];
-        string[index + 1] = 0;
         return {string, index + 1};
     }
 };
