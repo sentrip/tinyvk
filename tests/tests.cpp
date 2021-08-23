@@ -14,73 +14,7 @@
 #include "tinyvk_swapchain.h"
 #include "tinyvk_command.h"
 #include "tinyvk_pipeline_cache.h"
-
-
-#ifndef TINYVK_DESCRIPTOR_H
-#define TINYVK_DESCRIPTOR_H
-
-namespace tinyvk {
-
-enum descriptor_type_t {
-    DESCRIPTOR_SAMPLER,
-    DESCRIPTOR_COMBINED_IMAGE_SAMPLER,
-    DESCRIPTOR_SAMPLED_IMAGE,
-    DESCRIPTOR_STORAGE_IMAGE,
-    DESCRIPTOR_UNIFORM_TEXEL_BUFFER,
-    DESCRIPTOR_STORAGE_TEXEL_BUFFER,
-    DESCRIPTOR_UNIFORM_BUFFER,
-    DESCRIPTOR_STORAGE_BUFFER,
-    DESCRIPTOR_UNIFORM_BUFFER_DYNAMIC,
-    DESCRIPTOR_STORAGE_BUFFER_DYNAMIC,
-    DESCRIPTOR_INPUT_ATTACHMENT,
-    MAX_DESCRIPTOR_COUNT,
-};
-
-struct descriptor_pool : type_wrapper<descriptor_pool, VkDescriptorPool> {
-    struct size {
-        u32     count{};
-        float   sizes[MAX_DESCRIPTOR_COUNT]{1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-                                            1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f};
-    };
-
-};
-
-
-struct descriptor_set_layout : type_wrapper<descriptor_set_layout, VkDescriptorSetLayout> {
-
-};
-
-
-struct descriptor_pool_allocator {
-
-};
-
-
-struct descriptor_set_layout_cache {
-
-};
-
-
-struct descriptor_set_builder {
-
-};
-
-}
-
-#endif //TINYVK_DESCRIPTOR_H
-
-#ifdef TINYVK_IMPLEMENTATION
-
-#ifndef TINYVK_DESCRIPTOR_CPP
-#define TINYVK_DESCRIPTOR_CPP
-
-namespace tinyvk {
-
-}
-
-#endif //TINYVK_DESCRIPTOR_CPP
-
-#endif //TINYVK_IMPLEMENTATION
+#include "tinyvk_descriptor.h"
 
 
 

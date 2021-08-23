@@ -95,6 +95,18 @@ using tinystd::ibool;
 using vk_alloc = const VkAllocationCallbacks*;
 
 
+enum shader_stage_t {
+    UNDEFINED = 0,
+    SHADER_VERTEX = 0x1,
+    SHADER_FRAGMENT = 0x2,
+    SHADER_COMPUTE = 0x4,
+    SHADER_GEOMETRY = 0x8,
+    SHADER_TESS_CTRL = 0x10,
+    SHADER_TESS_EVAL = 0x20,
+    SHADER_ALL = 0xff
+};
+
+
 template<typename Derived, typename VkType>
 struct type_wrapper {
     VkType vk{};

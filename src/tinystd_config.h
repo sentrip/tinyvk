@@ -29,6 +29,9 @@ using u64       = unsigned long long;
 using size_t    = unsigned long long;
 using ibool     = u32;
 
+template<typename T1, typename T2 = T1>
+struct pair { T1 first; T2 second; };
+
 }
 
 #endif //TINYSTD_CONFIG_H

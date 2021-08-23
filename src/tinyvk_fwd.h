@@ -31,16 +31,61 @@ struct swapchain;
 struct command;
 struct command_pool;
 
+/// tinyvk_descriptor.h
+struct descriptor;
+struct descriptor_pool_size;
+struct descriptor_pool;
+struct descriptor_set_layout;
+struct descriptor_pool_allocator;
+struct descriptor_set_layout_cache;
+struct descriptor_set_builder;
+
 /// tinyvk_pipeline_cache.h
 struct pipeline_cache_header;
 
-};
+/// tinyvk_shader.h
+struct shader_macro;
+
+}
 
 /// vulkan fwd
 struct VkAllocationCallbacks;
 
 #define TINYVK_DEFINE_HANDLE(X) typedef struct X##_T* X
 
+TINYVK_DEFINE_HANDLE(VkDevice);
+TINYVK_DEFINE_HANDLE(VkSwapchainKHR);
+TINYVK_DEFINE_HANDLE(VkInstance);
+TINYVK_DEFINE_HANDLE(VkSurfaceKHR);
+TINYVK_DEFINE_HANDLE(VkPhysicalDevice);
+TINYVK_DEFINE_HANDLE(VkDebugUtilsMessengerEXT);
+
+TINYVK_DEFINE_HANDLE(VkEvent);
+TINYVK_DEFINE_HANDLE(VkFence);
+TINYVK_DEFINE_HANDLE(VkSemaphore);
+TINYVK_DEFINE_HANDLE(VkQueue);
+TINYVK_DEFINE_HANDLE(VkQueryPool);
+
+TINYVK_DEFINE_HANDLE(VkBuffer);
+TINYVK_DEFINE_HANDLE(VkImage);
+TINYVK_DEFINE_HANDLE(VkSampler);
+TINYVK_DEFINE_HANDLE(VkImageView);
+TINYVK_DEFINE_HANDLE(VkCommandBuffer);
+TINYVK_DEFINE_HANDLE(VkCommandPool);
+
+TINYVK_DEFINE_HANDLE(VkDescriptorPool);
+TINYVK_DEFINE_HANDLE(VkDescriptorSet);
+TINYVK_DEFINE_HANDLE(VkDescriptorSetLayout);
+
+TINYVK_DEFINE_HANDLE(VkPipeline);
+TINYVK_DEFINE_HANDLE(VkPipelineLayout);
+TINYVK_DEFINE_HANDLE(VkPipelineCache);
+TINYVK_DEFINE_HANDLE(VkShaderModule);
+
+TINYVK_DEFINE_HANDLE(VkRenderPass);
+TINYVK_DEFINE_HANDLE(VkFramebuffer);
+
 TINYVK_DEFINE_HANDLE(VmaAllocator);
+TINYVK_DEFINE_HANDLE(VmaAllocation);
 
 #endif //TINYVK_FWD_H

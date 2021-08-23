@@ -181,6 +181,12 @@ void do_sort(T* begin, T* end, Compare&& compare)
 
 }
 
+
+inline void hash_combine(size_t& seed, size_t h) noexcept
+{
+    seed ^= h + 0x9e3779b9 + (seed<<6) + (seed>>2);
+}
+
 inline u32 hash_crc32(span<const u8> data)
 {
    int i{}, j{};

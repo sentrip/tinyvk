@@ -12,16 +12,6 @@ namespace tinyvk {
 using shader_binary = small_vector<u32, 1024>;
 
 
-enum shader_stage_t {
-    SHADER_VERTEX,
-    SHADER_FRAGMENT,
-    SHADER_COMPUTE,
-    SHADER_GEOMETRY,
-    SHADER_TESS_CTRL,
-    SHADER_TESS_EVAL,
-    MAX_SHADER_COUNT
-};
-
 enum shader_optimization_t {
     SHADER_OPTIMIZATION_NONE,
     SHADER_OPTIMIZATION_SIZE,

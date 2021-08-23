@@ -142,7 +142,7 @@ compile_shader_glslangvalidator_files(
     // macros
     {
        for (const auto& macro: macros) {
-            cmd.append(" -D", 4);
+            cmd.append(" -D", 3);
             cmd.append(macro.define, strlen(macro.define));
             cmd.append("=\"", 2);
             cmd.append(macro.value, strlen(macro.value));
