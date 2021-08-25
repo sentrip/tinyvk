@@ -57,6 +57,10 @@
 #define TINYVK_PIPELINE_CACHE_PATH_MAX_SIZE 256
 #endif
 
+#ifndef TINYVK_DESCRIPTOR_API_LIMITS
+#define TINYVK_DESCRIPTOR_API_LIMITS        tinyvk::default_descriptor_api_limits
+#endif
+
 
 #define DEFINE_ENUM_FLAG(ENUM_TYPE)                                                                        \
 	static inline ENUM_TYPE operator|(ENUM_TYPE a, ENUM_TYPE b) { return (ENUM_TYPE)((uint32_t)(a) | (uint32_t)(b)); } \
@@ -100,18 +104,38 @@ using tinystd::u64;
 using tinystd::size_t;
 using tinystd::ibool;
 
+
 using vk_alloc = const VkAllocationCallbacks*;
 
 
-enum shader_stage_t {
-    UNDEFINED = 0,
-    SHADER_VERTEX = 0x1,
-    SHADER_FRAGMENT = 0x2,
-    SHADER_COMPUTE = 0x4,
-    SHADER_GEOMETRY = 0x8,
-    SHADER_TESS_CTRL = 0x10,
-    SHADER_TESS_EVAL = 0x20,
-    SHADER_ALL = 0xff
+enum shader_stage_t : u32 {
+//    UNDEFINED = 0,
+//    SHADER_VERTEX = 0x1,
+//    SHADER_FRAGMENT = 0x2,
+//    SHADER_COMPUTE = 0x4,
+//    SHADER_GEOMETRY = 0x8,
+//    SHADER_TESS_CTRL = 0x10,
+//    SHADER_TESS_EVAL = 0x20,
+//    SHADER_ALL = 0xff
+
+
+    SHADER_UNDEFINED = 0,
+    SHADER_VERTEX = 0x00000001,
+    SHADER_TESS_CTRL = 0x00000002,
+    SHADER_TESS_EVAL = 0x00000004,
+    SHADER_GEOMETRY = 0x00000008,
+    SHADER_FRAGMENT = 0x00000010,
+    SHADER_COMPUTE = 0x00000020,
+    SHADER_ALL_GRAPHICS = 0x0000001F,
+    SHADER_ALL = 0x7FFFFFFF,
+    SHADER_RAYGEN = 0x00000100,
+    SHADER_ANY_HIT = 0x00000200,
+    SHADER_CLOSEST_HIT = 0x00000400,
+    SHADER_MISS = 0x00000800,
+    SHADER_INTERSECTION = 0x00001000,
+    SHADER_CALLABLE = 0x00002000,
+    SHADER_TASK = 0x00000040,
+    SHADER_MESH = 0x00000080
 };
 
 

@@ -29,11 +29,11 @@ struct shader_module : type_wrapper<shader_module, VkShaderModule> {
     static shader_module        create(
             VkDevice                device,
             const shader_binary&    code,
-            vk_alloc                alloc = {});
+            vk_alloc                alloc = {}) NEX;
 
     void                        destroy(
             VkDevice                device,
-            vk_alloc                alloc = {});
+            vk_alloc                alloc = {}) NEX;
 };
 
 
@@ -78,7 +78,7 @@ shader_module
 shader_module::create(
         VkDevice device,
         const shader_binary& code,
-        vk_alloc alloc)
+        vk_alloc alloc) NEX
 {
     shader_module m;
     VkShaderModuleCreateInfo create_info{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
@@ -92,7 +92,7 @@ shader_module::create(
 void
 shader_module::destroy(
         VkDevice device,
-        vk_alloc alloc)
+        vk_alloc alloc) NEX
 {
     vkDestroyShaderModule(device, vk, alloc);
     vk = {};

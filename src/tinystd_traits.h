@@ -12,6 +12,9 @@ namespace tinystd {
 template<typename...>
 struct void_t {  };
 
+template <class T>
+T&& declval() noexcept;
+
 
 template <bool Test, class T = void>
 struct enable_if { struct unique{}; using type = unique; };
@@ -46,6 +49,16 @@ template<typename T>
 using remove_reference_t = typename remove_reference<T>::type;
 
 
+template<typename L, typename R>
+struct is_same { static constexpr bool value = false; };
+
+template<typename T>
+struct is_same<T, T> { static constexpr bool value = true; };
+
+template<typename L, typename R>
+static constexpr bool is_same_v = is_same<L, R>::value;
+
+
 template<typename T>
 struct is_const { static constexpr bool value = false; };
 
@@ -55,9 +68,6 @@ struct is_const<const T> { static constexpr bool value = true; };
 template<typename T>
 static constexpr bool is_const_v = is_const<T>::value;
 
-
-template <class T>
-T&& declval() noexcept;
 
 
 template<typename T>

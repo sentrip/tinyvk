@@ -35,10 +35,12 @@ struct command_pool;
 struct descriptor;
 struct descriptor_pool_size;
 struct descriptor_pool;
+struct descriptor_set;
 struct descriptor_set_layout;
 struct descriptor_pool_allocator;
 struct descriptor_set_layout_cache;
 struct descriptor_set_builder;
+struct descriptor_set_context;
 
 /// tinyvk_pipeline_cache.h
 struct pipeline_cache_header;

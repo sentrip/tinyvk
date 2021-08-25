@@ -1,8 +1,8 @@
 
 add_executable(test_tinyvk
     tests.cpp
-#    test_device.cpp
-#    test_shader.cpp
+    test_device.cpp
+    test_shader.cpp
     )
 
 target_link_libraries(test_tinyvk PRIVATE tinyvk)

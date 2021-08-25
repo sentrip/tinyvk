@@ -33,15 +33,9 @@ namespace tinyvk {
 
 #define TINYVK_USE_VMA
 #define TINYVK_IMPLEMENTATION
-#include "tinyvk_queue.h"
-#include "tinyvk_device.h"
-#include "tinyvk_swapchain.h"
-#include "tinyvk_command.h"
-#include "tinyvk_pipeline_cache.h"
-#include "tinyvk_descriptor.h"
-#include "tinyvk_shader.h"
 
 
+//region buffer
 
 #ifndef TINYVK_BUFFER_H
 #define TINYVK_BUFFER_H
@@ -85,11 +79,11 @@ struct buffer : type_wrapper<buffer, VkBuffer> {
             VmaAllocator        vma_alloc,
             VmaAllocation*      alloc,
             const buffer_desc&  desc,
-            u8**                pp_mapped_data = {});
+            u8**                pp_mapped_data = {}) NEX;
 
     void                destroy(
             VmaAllocator        vma_alloc,
-            VmaAllocation       alloc);
+            VmaAllocation       alloc) NEX;
 #endif
 };
 
@@ -113,7 +107,7 @@ buffer::create(
         VmaAllocator vma_alloc,
         VmaAllocation* alloc,
         const buffer_desc& desc,
-        u8** pp_mapped_data)
+        u8** pp_mapped_data) NEX
 {
     buffer b;
     const u64 alignment = desc.alignment ? desc.alignment : 4;
@@ -147,7 +141,7 @@ buffer::create(
 void
 buffer::destroy(
         VmaAllocator vma_alloc,
-        VmaAllocation alloc)
+        VmaAllocation alloc) NEX
 {
     vmaDestroyBuffer(vma_alloc, vk, alloc);
 }
@@ -160,8 +154,236 @@ buffer::destroy(
 
 #endif
 
+//endregion
+
+//region pipeline
+#ifndef TINYVK_PIPELINE_H
+#define TINYVK_PIPELINE_H
+
+#include "tinyvk_core.h"
+
+struct VkGraphicsPipelineCreateInfoa {
+    const VkPipelineVertexInputStateCreateInfo*      pVertexInputState;
+
+    const VkPipelineInputAssemblyStateCreateInfo*    pInputAssemblyState;
+
+    const VkPipelineTessellationStateCreateInfo*     pTessellationState;
+
+    const VkPipelineViewportStateCreateInfo*         pViewportState;
+
+    const VkPipelineRasterizationStateCreateInfo*    pRasterizationState;
+
+    const VkPipelineMultisampleStateCreateInfo*      pMultisampleState;
+
+    const VkPipelineDepthStencilStateCreateInfo*     pDepthStencilState;
+
+    const VkPipelineColorBlendStateCreateInfo*       pColorBlendState;
+
+    const VkPipelineDynamicStateCreateInfo*          pDynamicState;
+};
 
 
+namespace tinyvk {
+
+
+enum pipeline_type_t {
+    PIPELINE_GRAPHICS,
+    PIPELINE_COMPUTE,
+    PIPELINE_RAYTRACING
+};
+
+
+struct pipeline : type_wrapper<pipeline, VkPipeline> {
+    struct graphics;
+    struct compute;
+
+    struct shader_stage;
+    struct shader_stage_info;
+
+    static void         create_graphics(
+            VkDevice                device,
+            span<VkPipeline>        pipelines,
+            span<const graphics>    desc,
+            VkPipelineCache         cache = {},
+            vk_alloc                alloc = {}) NEX;
+
+    static void         create_compute(
+            VkDevice                device,
+            span<VkPipeline>        pipelines,
+            span<const compute>     desc,
+            VkPipelineCache         cache = {},
+            vk_alloc                alloc = {}) NEX;
+};
+
+
+struct pipeline_binding {
+    u64                     type                : 8;
+    u64                     dynamic_state       : 16;
+    u64                     set_count           : 8;
+    u64                     frame_count         : 8;
+    u64                     first_set           : 8;
+    u64                     _                   : 16;
+    VkPipeline              pipeline{};
+    VkPipelineLayout        layout{};
+    const VkDescriptorSet*  sets{};
+
+    pipeline_binding();
+
+    static pipeline_binding         create(
+            pipeline_type_t             type,
+            VkPipeline                  pipeline,
+            VkPipelineLayout            layout,
+            span<const VkDescriptorSet> sets,
+            u32                         set_count = 1,
+            u32                         frame_count = 1,
+            u32                         first_set = 0) NEX;
+
+    span<const VkDescriptorSet>     bind(
+            u32                         frame = 0,
+            u32                         thread = 0) const NEX;
+};
+
+
+/// pipeline description
+
+struct pipeline::graphics : VkGraphicsPipelineCreateInfo {
+    graphics() = default;
+
+    explicit graphics(
+            u32 x);
+};
+
+
+struct pipeline::compute : VkComputePipelineCreateInfo {
+    compute() = default;
+
+    explicit compute(
+            u32 x);
+};
+
+
+/// pipeline description parts
+
+struct pipeline::shader_stage {
+    VkShaderModule                  shader{};
+    shader_stage_t                  stages{};
+    /* specialization constants */
+};
+
+
+struct pipeline::shader_stage_info {
+    VkPipelineShaderStageCreateInfo infos[8]{};
+    u32                             count{};
+
+    shader_stage_info() = default;
+
+    template<size_t N>
+    explicit shader_stage_info(
+            const shader_stage(&stages)[N]);
+
+    void                    add(
+            const shader_stage& stage) NEX;
+};
+
+}
+
+#endif //TINYVK_PIPELINE_H
+
+#ifdef TINYVK_IMPLEMENTATION
+
+#ifndef TINYVK_PIPELINE_CPP
+#define TINYVK_PIPELINE_CPP
+
+namespace tinyvk {
+
+//region pipeline
+
+void
+pipeline::create_graphics(
+        VkDevice device,
+        span<VkPipeline> pipelines,
+        span<const graphics> desc,
+        VkPipelineCache cache,
+        vk_alloc alloc) NEX
+{
+    tassert(pipelines.size() == desc.size() && "Must provide equal number of pipelines and descriptions");
+    vk_validate(vkCreateGraphicsPipelines(device, cache, desc.size(), desc.data(), alloc, pipelines.data()),
+        "tinyvk::pipeline::create_graphics - Failed to create pipelines");
+}
+
+
+void
+pipeline::create_compute(
+        VkDevice device,
+        span<VkPipeline> pipelines,
+        span<const pipeline::compute> desc,
+        VkPipelineCache cache,
+        vk_alloc alloc) NEX
+{
+    tassert(pipelines.size() == desc.size() && "Must provide equal number of pipelines and descriptions");
+    vk_validate(vkCreateComputePipelines(device, cache, desc.size(), desc.data(), alloc, pipelines.data()),
+        "tinyvk::pipeline::create_compute - Failed to create pipelines");
+}
+
+//endregion
+
+//region pipeline_binding
+
+pipeline_binding::
+pipeline_binding():
+    type{}, dynamic_state{},
+    set_count{}, frame_count{}, first_set{},
+    _{}, pipeline{}, layout{}, sets{}
+{}
+
+
+pipeline_binding
+pipeline_binding::create(
+        pipeline_type_t type,
+        VkPipeline pipeline,
+        VkPipelineLayout layout,
+        span<const VkDescriptorSet> sets,
+        u32 set_count,
+        u32 frame_count,
+        u32 first_set) NEX
+{
+    pipeline_binding b;
+    b.type = u64(type);
+    b.set_count = set_count;
+    b.frame_count = frame_count;
+    b.first_set = first_set;
+    b.pipeline = pipeline;
+    b.layout = layout;
+    b.sets = sets.data();
+    return b;
+}
+
+
+span<const VkDescriptorSet>
+pipeline_binding::bind(
+        u32 frame,
+        u32 thread) const NEX
+{
+    return {&sets[(thread * frame_count * set_count) + (frame * set_count)], set_count};
+}
+
+//endregion
+
+}
+
+#endif //TINYVK_PIPELINE_CPP
+
+#endif
+
+//endregion
+
+#include "tinyvk_queue.h"
+#include "tinyvk_device.h"
+#include "tinyvk_swapchain.h"
+#include "tinyvk_command.h"
+#include "tinyvk_pipeline_cache.h"
+#include "tinyvk_descriptor.h"
+#include "tinyvk_shader.h"
 
 #define CATCH_CONFIG_RUNNER
 #include "catch.hpp"
@@ -240,14 +462,14 @@ TEST_CASE("Scratch test", "[GPU]")
     auto buf = buffer::create(vma_alloc, &a, {512});
 
     descriptor_pool_allocator alloc;
-    alloc.init(device, {});
     descriptor_set_layout_cache cache;
-    descriptor_set_builder build{alloc};
+    descriptor_set_builder build;
+    alloc.init(device, {});
 
     VkDescriptorSet set{};
     VkDescriptorBufferInfo bi{buf, 0, -1ull};
     build.bind_buffers(0, {&bi, 1}, DESCRIPTOR_STORAGE_BUFFER);
-    build.build(device, {&set, 1}, &cache, {});
+    build.build(device, alloc, {&set, 1}, &cache, {});
 
     alloc.destroy(device);
     cache.destroy(device);

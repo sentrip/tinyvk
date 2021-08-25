@@ -44,17 +44,25 @@ struct stack_vector {
 
     void        push_back(const T& v)
     {
-        if (m_size >= m_capacity) {
-            while (m_size >= m_capacity)
-                m_capacity *= 2;
-            auto* new_memory = (T*)tinystd::malloc(m_capacity * sizeof(T));
-            tinystd::memcpy(m_begin, new_memory, m_size * sizeof(T));
-            if (m_begin != m_data)
-                tinystd::free(m_begin);
-            m_begin = new_memory;
-        }
-
+        ensure_capacity(1);
         m_begin[m_size++] = v;
+    }
+
+    void        insert(const T* it, const T& v)
+    {
+        const size_t begin = it - m_begin;
+        ensure_capacity(1);
+        for (size_t i = m_size; i > begin; --i)
+            m_data[i] = m_data[i - 1];
+        m_data[begin] = v;
+        ++m_size;
+    }
+
+    void        erase(const T* it)
+    {
+        for (size_t i = (it - m_begin); i < m_size - 1; ++i)
+            m_data[i] = m_data[i + 1];
+        --m_size;
     }
 
     void        resize(size_t n)
@@ -63,7 +71,7 @@ struct stack_vector {
         if (m_begin != m_data)
             tinystd::free(m_begin);
         m_begin = n > N ? (T*)tinystd::malloc(n * sizeof(T)) : m_data;
-        if (old_begin != m_begin)
+        if (n > 0 && old_begin != m_begin)
             tinystd::memcpy(m_begin, old_begin, n * sizeof(T));
         m_size = n;
     }
@@ -107,6 +115,21 @@ struct stack_vector {
             o.m_size = 0;
         }
         return *this;
+    }
+
+private:
+    void ensure_capacity(size_t n)
+    {
+        const size_t size = m_size + n;
+        if (size <= m_capacity)
+            return;
+        while (size >= m_capacity)
+            m_capacity *= 2;
+        auto* new_memory = (T*)tinystd::malloc(m_capacity * sizeof(T));
+        tinystd::memcpy(m_begin, new_memory, m_size * sizeof(T));
+        if (m_begin != m_data)
+            tinystd::free(m_begin);
+        m_begin = new_memory;
     }
 
 };
