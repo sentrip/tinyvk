@@ -252,6 +252,7 @@ descriptor_set::write_buffers(
         VkDescriptorSet set) NEX
 {
     VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+    write.dstSet = set;
     write.dstBinding = binding;
     write.dstArrayElement = array_index;
     write.descriptorCount = u32(infos.size());
@@ -272,6 +273,7 @@ descriptor_set::write_images(
         VkDescriptorSet set) NEX
 {
     VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+    write.dstSet = set;
     write.dstBinding = binding;
     write.dstArrayElement = array_index;
     write.descriptorCount = u32(infos.size());
@@ -289,7 +291,8 @@ descriptor_set::write(
         VkDescriptorSet set) NEX
 {
     if (!vec.empty()) {
-        for (auto& v: vec) v.dstSet = set;
+        if (set)
+            for (auto& v: vec) v.dstSet = set;
         vkUpdateDescriptorSets(device, u32(vec.size()), vec.data(), 0, nullptr);
     }
 }
