@@ -454,7 +454,7 @@ vk_physical_device_feature(
         case FEATURE_SPARSE_RESIDENCY_IMAGE3_D: return features.sparseResidencyImage3D;
     }
     tinystd::error("Unknown device feature: 0x%llx\n", u64(requested_feature));
-    exit(1);
+    tinystd::exit(1);
     return features.multiDrawIndirect;
 }
 

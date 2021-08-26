@@ -40,7 +40,7 @@ struct stack_vector {
 
     void        clear()                     { m_size = 0; }
 
-    T           pop_back()                  { return m_begin[m_size--]; }
+    T           pop_back()                  { return m_begin[--m_size]; }
 
     void        push_back(const T& v)
     {

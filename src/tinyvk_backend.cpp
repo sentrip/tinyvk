@@ -5,6 +5,9 @@
 
 #include <vulkan/vulkan.h>
 #include "vk_mem_alloc.h"
+#include <cstdio>
+
+#define TINYVK_BACKEND_TEST
 
 #ifdef TINYVK_BACKEND_TEST
 
@@ -30,6 +33,10 @@ VKAPI_ATTR VkResult VKAPI_CALL vkEnumeratePhysicalDevices(
     uint32_t*                                   pPhysicalDeviceCount,
     VkPhysicalDevice*                           pPhysicalDevices)
 {
+    if (!pPhysicalDevices) *pPhysicalDeviceCount = 1;
+    else {
+        pPhysicalDevices[0] = VkPhysicalDevice(1);
+    }
     return VK_SUCCESS;
 }
 
@@ -551,6 +558,11 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateDescriptorSetLayout(
     const VkAllocationCallbacks*                pAllocator,
     VkDescriptorSetLayout*                      pSetLayout)
 {
+    printf("vkCreateDescriptorSetLayout (%u) - \n", pCreateInfo->bindingCount);
+    for (uint32_t i = 0; i < pCreateInfo->bindingCount; ++i) {
+        auto& b = pCreateInfo->pBindings[i];
+        printf("-    bind: %u, type: %u, count: %u\n", b.binding, b.descriptorType, b.descriptorCount);
+    }
     return VK_SUCCESS;
 }
 
@@ -568,6 +580,7 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateDescriptorPool(
     const VkAllocationCallbacks*                pAllocator,
     VkDescriptorPool*                           pDescriptorPool)
 {
+    *pDescriptorPool = VkDescriptorPool(1);
     return VK_SUCCESS;
 }
 
@@ -579,11 +592,21 @@ VKAPI_ATTR void VKAPI_CALL vkDestroyDescriptorPool(
 
 }
 
+VKAPI_ATTR VkResult VKAPI_CALL vkResetDescriptorPool(
+    VkDevice                                    device,
+    VkDescriptorPool                            descriptorPool,
+    VkDescriptorPoolResetFlags                  flags)
+{
+    return VK_SUCCESS;
+}
+
 VKAPI_ATTR VkResult VKAPI_CALL vkAllocateDescriptorSets(
     VkDevice                                    device,
     const VkDescriptorSetAllocateInfo*          pAllocateInfo,
     VkDescriptorSet*                            pDescriptorSets)
 {
+    for (uint64_t i = 0; i < pAllocateInfo->descriptorSetCount; ++i)
+        pDescriptorSets[i] = VkDescriptorSet(i + 1);
     return VK_SUCCESS;
 }
 
@@ -603,7 +626,15 @@ VKAPI_ATTR void VKAPI_CALL vkUpdateDescriptorSets(
     uint32_t                                    descriptorCopyCount,
     const VkCopyDescriptorSet*                  pDescriptorCopies)
 {
-
+    printf("vkUpdateDescriptorSets: writes (%u), copies (%u) - \n", descriptorWriteCount, descriptorCopyCount);
+    for (uint32_t i = 0; i < descriptorWriteCount; ++i) {
+        auto& w = pDescriptorWrites[i];
+        printf("-    write: bind: %u, type: %u, set: 0x%llx\n", w.dstBinding, w.descriptorType, uint64_t(w.dstSet));
+    }
+    for (uint32_t i = 0; i < descriptorCopyCount; ++i) {
+        auto& w = pDescriptorCopies[i];
+        printf("-    copy: src_bind: %u, src_set: 0x%llx, dst_bind: %u, dst_set: 0x%llx\n", w.srcBinding, uint64_t(w.srcSet), w.dstBinding, uint64_t(w.dstSet));
+    }
 }
 
 //endregion
