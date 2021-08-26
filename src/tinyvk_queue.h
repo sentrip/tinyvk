@@ -205,17 +205,17 @@ queue_availability(
     for (u32 type = 0; type < MAX_QUEUE_COUNT; ++type) {
         auto it = tinystd::find_if(requests.begin(), requests.end(), [=](auto& r){ return u32(r.type) == type; });
         if (it != requests.end()) {
-            requested[type] += it->count == -1u ? available[type] : tinystd::min(available[type], it->min_count);
+            requested[type] += it->count == -1u ? available[type] : it->count;
 
             // Attempt to request an additional graphics queue if dedicated present is requested
             if (type == QUEUE_GRAPHICS && dedicated_present && requested[type] < available[type])
                 ++requested[type];
 
-            if (requested[type] > available[type]) {
-                tinystd::error("QueueType %u - Requested more queues (%u) than are available (%u)\n",
-                                type, requested[type], available[type]);
-                tinystd::exit(1);
-            }
+//            if (requested[type] > available[type]) {
+//                tinystd::error("QueueType %u - Requested more queues (%u) than are available (%u)\n",
+//                                type, requested[type], available[type]);
+//                tinystd::exit(1);
+//            }
         }
     }
 
@@ -286,15 +286,19 @@ queue_create_info(
         to_sort[r.type] = r;
 
     if(!requests.empty()) {
+        bool sorted = true;
+        u32 i = 0;
         for (const auto& r: requests) {
             tassert((
                 r.priorities.empty()
                 || r.priorities.size() == 1
                 || r.priorities.size() == r.count
             ) && "tinyvk::queue_create_info::queue_create_info - Invalid queue priorities");
+            sorted &= (u32(r.type) == i++);
         }
-        tinystd::sort(queue_order, queue_order + MAX_QUEUE_COUNT,
-                      [&](u32 l, u32 r){ return to_sort[l].priority > to_sort[r].priority; });
+        if (!sorted)
+            tinystd::sort(queue_order, queue_order + MAX_QUEUE_COUNT,
+                          [&](u32 l, u32 r){ return to_sort[l].priority > to_sort[r].priority; });
     }
 
     queue_index_t original_family_counts[MAX_QUEUE_FAMILIES]{};
@@ -427,7 +431,11 @@ queue_create_info::get_shared(
             if (physical_index != UINT8_MAX) break;
         }
         tassert(physical_index != UINT8_MAX && "Failed to find queue to share");
-        infos.push_back({u8(family), true, u8(1u << type), 0, physical_index});
+        u32 remaining = av.requested[type];
+        while (remaining) {
+            infos.push_back({u8(family), true, u8(1u << type), queue_index_t(infos.size()), physical_index});
+            --remaining;
+        }
     }
 
     for (u32 type = 0; type < MAX_QUEUE_COUNT; ++type) {

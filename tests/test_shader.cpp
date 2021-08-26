@@ -5,6 +5,7 @@
 #include "catch.hpp"
 
 #include "tinyvk_shader.h"
+#include <cstring>
 
 static constexpr const char* SRC = R"(
 #version 450
