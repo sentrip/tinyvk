@@ -5,6 +5,7 @@
 #include "catch.hpp"
 
 #define TINYVK_USE_VMA
+#define TINYVK_IMPLEMENTATION
 #include "tinyvk_queue.h"
 #include "tinyvk_device.h"
 

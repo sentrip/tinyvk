@@ -63,6 +63,13 @@ compile_shader_glslangvalidator_files(
         span<const shader_macro>    macros = {},
         shader_optimization_t       opt_level = SHADER_OPTIMIZATION_NONE);
 
+
+ibool
+preprocess_shader_cpp(
+        span<const char>            src_code,
+        small_vector<char, 1024>&   output,
+        span<const shader_macro>    macros);
+
 }
 
 #endif //TINYVK_SHADER_H

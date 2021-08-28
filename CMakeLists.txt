@@ -64,6 +64,15 @@ endif()
 
 # TESTS
 if (${TINYVK_BUILD_TESTS})
+    add_library(tinyvk_test STATIC ${TINYVK_SRCS})
+    target_include_directories(tinyvk_test
+        ${TINYVK_PUBLIC} $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+        ${TINYVK_PUBLIC} $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+    )
+    target_include_directories(tinyvk_test ${TINYVK_PUBLIC} $ENV{VULKAN_SDK}/include)
+    target_compile_definitions(tinyvk_test ${TINYVK_PRIVATE} TINYVK_BACKEND_TEST)
+    tinyvk_link_shaderc(tinyvk_test)
+
     add_subdirectory(tests)
 endif()
 

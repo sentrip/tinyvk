@@ -6,6 +6,7 @@
 #define TINYSTD_SPAN_H
 
 #include "tinystd_config.h"
+#include "tinystd_traits.h"
 
 namespace tinystd {
 

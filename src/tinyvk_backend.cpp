@@ -7,7 +7,6 @@
 #include "vk_mem_alloc.h"
 #include <cstdio>
 
-#define TINYVK_BACKEND_TEST
 
 #ifdef TINYVK_BACKEND_TEST
 
