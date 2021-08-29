@@ -68,11 +68,17 @@ struct stack_vector {
     void        resize(size_t n)
     {
         auto* old_begin = m_begin;
-        if (m_begin != m_data)
-            tinystd::free(m_begin);
-        m_begin = n > N ? (T*)tinystd::malloc(n * sizeof(T)) : m_data;
+        auto old_capacity = m_capacity;
+        while(n > m_capacity)
+            m_capacity *= 2;
+        if (n > N && m_capacity != old_capacity)
+            m_begin = (T*)tinystd::malloc(m_capacity * sizeof(T));
+        else
+            m_begin = n > N ? m_begin : m_data;
         if (n > 0 && old_begin != m_begin)
-            tinystd::memcpy(m_begin, old_begin, n * sizeof(T));
+            tinystd::memcpy(m_begin, old_begin, m_size * sizeof(T));
+        if (old_begin != m_data && m_capacity != old_capacity)
+            tinystd::free(old_begin);
         m_size = n;
     }
 
