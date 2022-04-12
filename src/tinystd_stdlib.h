@@ -17,6 +17,10 @@ void memcpy(void* dst, const void* src, size_t size);
 
 void memset(void* dst, u8 byte, size_t size);
 
+bool memeq(const void* l, const void* r, size_t size);
+
+bool streq(const char* l, const char* r);
+
 void exit(int code);
 
 int print(const char* fmt, ...);

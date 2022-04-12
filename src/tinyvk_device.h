@@ -197,9 +197,6 @@ namespace tinyvk {
 #define VK_API_VERSION_1_2 VK_API_VERSION_1_1
 #endif
 
-static bool str_equal(const char* s1, const char* s2) { while(*s1 && *s2 && *s1 == *s2) { ++s1; ++s2; } return (*s1 | *s2) == 0; }
-static bool mem_equal(const u8* s1, const u8* s2, size_t n) { for (size_t i = 0; i < n; ++i) { if (s1[i] != s2[i]) return false; } return true; }
-
 template<typename Int, typename OnChar>
 static void str_from_int(Int i, OnChar&& on_char)
 {
@@ -252,7 +249,7 @@ extensions::device_extensions_supported(
     for (const char* ext: device) {
         ibool found = false;
         for (const auto& available: available_extensions) {
-            if (str_equal(ext, available.extensionName)) {
+            if (tinystd::streq(ext, available.extensionName)) {
                 found = true;
                 break;
             }
@@ -280,7 +277,7 @@ extensions::validation_layers_supported() const NEX
     for (const auto* layer: validation_layers) {
         ibool found = false;
         for (const auto &props: available_layers) {
-            if (str_equal(layer, props.layerName)) {
+            if (tinystd::streq(layer, props.layerName)) {
                 found = true;
                 break;
             }
@@ -565,7 +562,7 @@ static ibool is_bugged_message(debug_messenger::callback_data data)
         VkGraphicsPipelineCreateInfo structure specified when creating the VkPipeline bound to VK_PIPELINE_BIND_POINT_GRAPHICS.
         https://www.khronos.org/registry/vulkan/specs/1.1-extensions/html/vkspec.html#VUID-vkCmdDraw-renderPass-02684
     */
-    if (data->pMessageIdName && str_equal(data->pMessageIdName, "VUID-vkCmdDraw-renderPass-02684"))
+    if (data->pMessageIdName && tinystd::streq(data->pMessageIdName, "VUID-vkCmdDraw-renderPass-02684"))
         return true;
     return false;
 }

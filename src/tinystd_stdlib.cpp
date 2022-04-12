@@ -16,6 +16,8 @@ void  free(void* ptr)                                   { return ::free(ptr); }
 void  memcpy(void* dst, const void* src, size_t size)   { ::memcpy(dst, src, size); }
 void  memset(void* dst, u8 byte, size_t size)           { ::memset(dst, byte, size); }
 void  exit(int code)                                    { ::exit(code); }
+bool memeq(const void* l, const void* r, size_t size)   { return ::memcmp(l, r, size) == 0; }
+bool streq(const char* l, const char* r)                { return ::strcmp(l, r) == 0; }
 
 int print(const char* fmt, ...)
 {
