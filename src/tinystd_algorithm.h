@@ -86,6 +86,31 @@ constexpr bool all_of(It begin, It end, F&& cond)
 }
 
 
+template<typename It, typename Compare>
+constexpr It find_element(It begin, It end, Compare&& compare) noexcept
+{
+    It v = begin, result = end;
+    for (auto it = begin; it != end; ++it)
+        if (compare(*it, *v))
+            v = result = it;
+    return result;
+}
+
+
+template<typename It>
+constexpr It min_element(It begin, It end) noexcept
+{
+    return find_element(begin, end, [](const auto& v, const auto& a){ return v < a; });
+}
+
+
+template<typename It>
+constexpr It max_element(It begin, It end) noexcept
+{
+    return find_element(begin, end, [](const auto& v, const auto& a){ return v > a; });
+}
+
+
 namespace sort_impl {
 
 template<typename T, typename Compare>
