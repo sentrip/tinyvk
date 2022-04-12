@@ -80,6 +80,7 @@ struct descriptor_set {
 
 
 struct descriptor_pool : type_wrapper<descriptor_pool, VkDescriptorPool> {
+    using set_layouts = span<const VkDescriptorSetLayout>;
 
     static descriptor_pool          create(
             VkDevice                    device,
@@ -89,6 +90,12 @@ struct descriptor_pool : type_wrapper<descriptor_pool, VkDescriptorPool> {
 
     void                            destroy(
             VkDevice                    device,
+            vk_alloc                    alloc = {}) NEX;
+
+    VkResult                        allocate(
+            VkDevice                    device,
+            span<VkDescriptorSet>       sets,
+            set_layouts                 layouts,
             vk_alloc                    alloc = {}) NEX;
 };
 
@@ -364,6 +371,22 @@ descriptor_pool::destroy(
 {
     vkDestroyDescriptorPool(device, vk, alloc);
     vk = {};
+}
+
+
+VkResult
+descriptor_pool::allocate(
+        VkDevice                    device,
+        span<VkDescriptorSet>       sets,
+        set_layouts                 layouts,
+        vk_alloc                    alloc) NEX
+{
+    tassert(vk && "tinyvk::descriptor_pool::allocate - Pool not initialized and cannot allocate");
+    VkDescriptorSetAllocateInfo alloc_info {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+    alloc_info.descriptorPool = vk;
+    alloc_info.descriptorSetCount = u32(sets.size());
+    alloc_info.pSetLayouts = layouts.data();
+    return vkAllocateDescriptorSets(device, &alloc_info, sets.data());
 }
 
 //endregion
