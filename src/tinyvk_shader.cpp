@@ -275,7 +275,7 @@ ibool preprocess_shader_cpp(
 
     if (success) {
         size_t nread{};
-        char buf[1024]{};
+        char buf[64000]{};
         FILE* file = fopen(output_name.data(), "rb");
         if (file) {
             output.resize(begin - src_code.data());
@@ -285,7 +285,7 @@ ibool preprocess_shader_cpp(
             output.push_back('\n');
             while ((nread = fread(buf, 1, sizeof(buf), file)) > 0) {
                 const size_t i = output.size();
-                output.resize(output.size() + nread/sizeof(u32));
+                output.resize(i + nread);
                 tinystd::memcpy(output.data() + i, buf, nread);
             }
             fclose(file);

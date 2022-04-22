@@ -111,7 +111,7 @@ pipeline_cache_header::valid(
         && (deviceID == props.deviceID)
         && (vendorID == props.vendorID)
         && (driverVersion == props.driverVersion)
-        && mem_equal(uuid, props.pipelineCacheUUID, VK_UUID_SIZE)
+        && tinystd::memeq(uuid, props.pipelineCacheUUID, VK_UUID_SIZE)
         && hash_crc32(data) == dataHash;
 }
 

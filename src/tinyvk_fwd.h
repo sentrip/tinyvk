@@ -49,6 +49,24 @@ struct pipeline_cache_header;
 struct shader_macro;
 struct shader_module;
 
+/// tinyvk_renderpass.h
+struct renderpass_desc;
+struct renderpass;
+struct framebuffer_desc;
+struct framebuffer;
+
+/// tinyvk_buffer.h
+struct buffer_desc;
+struct buffer_memory;
+struct buffer;
+
+/// tinyvk_image
+struct image_desc;
+struct image_memory;
+struct image;
+struct image_view_desc;
+struct image_view;
+
 }
 
 /// vulkan fwd

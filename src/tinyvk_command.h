@@ -28,7 +28,7 @@ struct command : type_wrapper<command, VkCommandBuffer> {
 };
 
 
-struct command_pool : type_wrapper<command, VkCommandPool> {
+struct command_pool : type_wrapper<command_pool, VkCommandPool> {
 
     static command_pool create(
             VkDevice                    device,
@@ -36,16 +36,16 @@ struct command_pool : type_wrapper<command, VkCommandPool> {
             command_pool_flags_t        flags = {},
             vk_alloc                    alloc = {}) NEX;
 
-    void            destroy(
+    void                destroy(
             VkDevice                    device,
             vk_alloc                    alloc = {}) NEX;
 
-    void            allocate(
+    void                allocate(
             VkDevice                    device,
             span<VkCommandBuffer>       cmds,
             bool secondary = false) const NEX;
 
-    void            free(
+    void                free(
             VkDevice                    device,
             span<VkCommandBuffer>       cmds) const NEX;
 };
