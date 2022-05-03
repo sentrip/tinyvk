@@ -2,43 +2,45 @@
 // Created by Djordje on 8/26/2021.
 //
 
-#define TINYVK_USE_VMA
-#define TINYVK_IMPLEMENTATION
-#include "tinyvk_device.h"
-#include "tinyvk_descriptor.h"
-#include "tinyvk_renderpass.h"
-#include "tinyvk_buffer.h"
-#include "tinyvk_image.h"
-
-struct TestDevice {
-    tinyvk::device device{};
-    tinyvk::instance instance{};
-
-    explicit TestDevice() {
-        // Instance
-        auto ext = tinyvk::extensions {};
-        instance = tinyvk::instance::create(tinyvk::application_info{}, ext);
-
-        // Physical device
-        auto devices = tinyvk::physical_devices{instance};
-        auto physical_device = devices.pick_best(ext, true);
-
-        // Logical Device and Queues
-        tinyvk::device_features_t features {};
-        auto queue_info = tinyvk::queue_create_info{{}, physical_device};
-        device = tinyvk::device::create(instance, physical_device, queue_info, ext, &features);
-    }
-
-    ~TestDevice() {
-        device.destroy();
-        instance.destroy();
-    }
-};
-
-
-#include "catch.hpp"
-
 /*
+TEST_CASE("pipeline", "[pipeline]")
+{
+    TestDevice device{};
+
+    VkPipelineLayout layout{};
+    VkRenderPass render_pass{};
+    tinystd::u32 subpass{};
+    tinyvk::pipeline::desc_storage storage{};
+    tinyvk::pipeline::graphics_desc desc{storage, layout, render_pass, subpass,
+        6, 16, 16,
+        tinyvk::TOPOLOGY_TRIANGLE_LIST, {}};
+
+    desc.add_stage(VkShaderModule{}, tinyvk::SHADER_TESS_CTRL);
+    desc.add_stage(VkShaderModule{}, tinyvk::SHADER_TESS_EVAL);
+    desc.add_stage(VkShaderModule{}, tinyvk::SHADER_VERTEX);
+    desc.add_stage(VkShaderModule{}, tinyvk::SHADER_GEOMETRY);
+    desc.add_stage(storage, VkShaderModule{}, tinyvk::SHADER_FRAGMENT, {storage, {
+        {0, uint32_t(5)}
+    }});
+
+    for (size_t i = 0; i < 16; ++i)
+        desc.add_vertex_binding(16);
+    for (size_t i = 0; i < 16; ++i)
+        desc.add_vertex_attribute(i, i, VK_FORMAT_R8G8_SNORM, i * 8);
+
+    desc.add_dynamic_state(VK_DYNAMIC_STATE_VIEWPORT);
+    desc.add_dynamic_state(VK_DYNAMIC_STATE_SCISSOR);
+
+    desc.enable_primitive_restart();
+    desc.tesselation(storage, 5);
+
+    tinyvk::pipeline::blend_desc att{};
+    desc.blending(storage, {&att, tinyvk::renderpass_api_limits::MAX_COLOR_ATTACHMENTS});
+    desc.depth(storage);
+    desc.viewport(storage, VkViewport{}, VkRect2D{});
+    printf("%llu\n", storage.m_offset);
+}
+
 TEST_CASE("Backend Descriptor", "[tinyvk_test]")
 {
     TestDevice d{};
@@ -68,7 +70,6 @@ TEST_CASE("Backend Descriptor", "[tinyvk_test]")
     alloc.destroy(d.device);
     cache.destroy(d.device);
 }
-*/
 
 //#include <bitset>
 //#include <iostream>
@@ -118,3 +119,65 @@ TEST_CASE("Backend Descriptor", "[tinyvk_test]")
 //    printf("%u\n", ((get_bits(1024.0f) & EXPONENT) >> EXPONENT_S) - 127);
 //    printf("%u\n", ((get_bits(1024.0f) & EXPONENT) >> EXPONENT_S) - 127);
 //}
+*/
+
+#define TINYVK_USE_VMA
+#define TINYVK_IMPLEMENTATION
+#include "tinyvk_device.h"
+#include "tinyvk_descriptor.h"
+#include "tinyvk_renderpass.h"
+#include "tinyvk_buffer.h"
+#include "tinyvk_image.h"
+#include "tinyvk_pipeline.h"
+#include "tinyvk_renderpass.h"
+
+
+struct TestDevice {
+    tinyvk::device device{};
+    tinyvk::instance instance{};
+
+    explicit TestDevice() {
+        // Instance
+        auto ext = tinyvk::extensions {};
+        instance = tinyvk::instance::create(tinyvk::application_info{}, ext);
+
+        // Physical device
+        auto devices = tinyvk::physical_devices{instance};
+        auto physical_device = devices.pick_best(ext, true);
+
+        // Logical Device and Queues
+        tinyvk::device_features_t features {};
+        auto queue_info = tinyvk::queue_create_info{{}, physical_device};
+        device = tinyvk::device::create(instance, physical_device, queue_info, ext, &features);
+    }
+
+    ~TestDevice() {
+        device.destroy();
+        instance.destroy();
+    }
+};
+
+
+#include "catch.hpp"
+
+TEST_CASE("device", "[tinyvk_test]")
+{
+    tinyvk::backend::set_debug(tinyvk::backend::all);
+
+    // Instance
+    auto ext = tinyvk::extensions {};
+    auto instance = tinyvk::instance::create(tinyvk::application_info{}, ext);
+
+    // Physical device
+    auto devices = tinyvk::physical_devices{instance};
+    auto physical_device = devices.pick_best(ext, true);
+
+    // Logical Device and Queues
+    tinyvk::device_features_t features {};
+    auto queue_info = tinyvk::queue_create_info{{}, physical_device};
+    auto device = tinyvk::device::create(instance, physical_device, queue_info, ext, &features);
+
+    const auto& d = tinyvk::backend::get_desc(device);
+    int x = 1;
+    int y = x;
+}

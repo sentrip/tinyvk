@@ -38,27 +38,35 @@
 #define NEX noexcept
 
 #ifndef TINYVK_MAX_QUEUE_FAMILIES
-#define TINYVK_MAX_QUEUE_FAMILIES           8
+#define TINYVK_MAX_QUEUE_FAMILIES               8
 #endif
 
 #ifndef TINYVK_MAX_DEVICE_QUEUES
-#define TINYVK_MAX_DEVICE_QUEUES            64
+#define TINYVK_MAX_DEVICE_QUEUES                64
 #endif
 
 #ifndef TINYVK_MAX_SWAPCHAIN_IMAGES
-#define TINYVK_MAX_SWAPCHAIN_IMAGES         8
-#endif
-
-#ifndef TINYVK_DEFAULT_TIMEOUT_NANOSECONDS
-#define TINYVK_DEFAULT_TIMEOUT_NANOSECONDS  1000000000
+#define TINYVK_MAX_SWAPCHAIN_IMAGES             8
 #endif
 
 #ifndef TINYVK_PIPELINE_CACHE_PATH_MAX_SIZE
-#define TINYVK_PIPELINE_CACHE_PATH_MAX_SIZE 256
+#define TINYVK_PIPELINE_CACHE_PATH_MAX_SIZE     256
+#endif
+
+#ifndef TINYVK_DEFAULT_MAX_PUSH_CONSTANT_SIZE
+#define TINYVK_DEFAULT_MAX_PUSH_CONSTANT_SIZE   128
+#endif
+
+#ifndef TINYVK_DEFAULT_TIMEOUT_NANOSECONDS
+#define TINYVK_DEFAULT_TIMEOUT_NANOSECONDS      1000000000
 #endif
 
 #ifndef TINYVK_DESCRIPTOR_API_LIMITS
 #define TINYVK_DESCRIPTOR_API_LIMITS        tinyvk::default_descriptor_api_limits
+#endif
+
+#ifndef TINYVK_RENDERPASS_API_LIMITS
+#define TINYVK_RENDERPASS_API_LIMITS        tinyvk::default_renderpass_api_limits
 #endif
 
 
@@ -75,11 +83,8 @@ enum {
     MAX_QUEUE_FAMILIES = TINYVK_MAX_QUEUE_FAMILIES,
     MAX_DEVICE_QUEUES = TINYVK_MAX_DEVICE_QUEUES,
     MAX_SWAPCHAIN_IMAGES = TINYVK_MAX_SWAPCHAIN_IMAGES,
+    MAX_PUSH_CONSTANT_SIZE = TINYVK_DEFAULT_MAX_PUSH_CONSTANT_SIZE,
     DEFAULT_TIMEOUT_NANOS = TINYVK_DEFAULT_TIMEOUT_NANOSECONDS,
-    //
-    MAX_COLOR_ATTACHMENTS = 8,
-    MAX_RENDER_SUBPASSES = 16,
-    MAX_RENDER_SUBPASS_DEPENDENCIES = 16,
 };
 
 template<size_t N>
@@ -96,6 +101,7 @@ using fixed_vector = TINYVK_FIXED_VECTOR(T, N);
 
 template<typename T>
 using span = TINYVK_SPAN(T);
+
 
 using tinystd::i8;
 using tinystd::i16;
@@ -134,7 +140,7 @@ enum image_layout_t: u32 {
 enum pipeline_type_t: u8 {
     PIPELINE_GRAPHICS,
     PIPELINE_COMPUTE,
-    PIPELINE_RTX,
+    PIPELINE_RAY_TRACING,
     MAX_PIPELINE_TYPE
 };
 
@@ -252,6 +258,40 @@ void vk_validate(VkResult r, const char* msg, Args&&... args)
     if (r == VK_SUCCESS) return;
     vk_check<Args...>(r, msg, tinystd::forward<Args>(args)...);
     tinystd::exit(1);
+}
+
+
+namespace backend {
+
+enum debug_t {
+     device                 = 1u << 0,
+     queue                  = 1u << 1,
+     swapchain              = 1u << 2,
+     shader                 = 1u << 3,
+     pipeline               = 1u << 4,
+     memory                 = 1u << 5,
+     sampler                = 1u << 6,
+     image                  = 1u << 7,
+     buffer                 = 1u << 8,
+     descriptor_pool        = 1u << 9,
+     descriptor_set         = 1u << 10,
+     descriptor_set_layout  = 1u << 11,
+     renderpass             = 1u << 12,
+     framebuffer            = 1u << 13,
+     command_pool           = 1u << 14,
+     command                = 1u << 15,
+     all                    = 0xffff,
+};
+using debug_flags = u32;
+
+void set_debug(debug_flags debug);
+
+
+const VkInstanceCreateInfo&     get_desc(VkInstance v);
+const VkDeviceCreateInfo&       get_desc(VkDevice v);
+const VkRenderPassCreateInfo&   get_desc(VkRenderPass v);
+const VkFramebufferCreateInfo&  get_desc(VkFramebuffer v);
+
 }
 
 }

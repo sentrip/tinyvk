@@ -34,9 +34,10 @@ enum buffer_usage_t: u32 {
 struct buffer_desc {
     u64                 size{};
     buffer_usage_t      usage{};
-    VmaMemoryUsage      mem_usage{};
+    vma_usage_t         mem_usage{};
+    vma_create_t        flags{};
     u64                 alignment{4};
-    bool                map_persistent{true};
+    span<const u32>     queue_families{};
 };
 
 
@@ -44,32 +45,28 @@ struct buffer : type_wrapper<buffer, VkBuffer> {
 
     static buffer                   create(
             VmaAllocator                vma,
+            VmaAllocation&              vma_alloc,
             buffer_desc                 desc,
-            buffer_memory&              mem,
-            vk_alloc                    alloc = {}) NEX;
+            void**                      p_mapped_data = {}) NEX;
 
     void                            destroy(
             VmaAllocator                vma,
-            buffer_memory&              mem,
-            vk_alloc                    alloc = {}) NEX;
-};
+            VmaAllocation               vma_alloc) NEX;
 
-
-struct buffer_memory {
-    u8*                 data{};
-    u64                 size{};
-    VmaAllocation       vma_alloc{};
-
-    void                            map(
-            VmaAllocator                vma) NEX;
-
-    void                            unmap(
-            VmaAllocator                vma) NEX;
-
-    void                            flush(
+    static void                     map(
             VmaAllocator                vma,
+            VmaAllocation               vma_alloc,
+            void**                      p_mapped_data) NEX;
+
+    static void                     unmap(
+            VmaAllocator                vma,
+            VmaAllocation               vma_alloc) NEX;
+
+    static void                     flush(
+            VmaAllocator                vma,
+            VmaAllocation               vma_alloc,
             u64                         offset = 0ull,
-            u64                         size = -1ull) const NEX;
+            u64                         size = -1ull) NEX;
 };
 
 #else
@@ -94,35 +91,31 @@ namespace tinyvk {
 buffer
 buffer::create(
         VmaAllocator vma,
+        VmaAllocation& vma_alloc,
         buffer_desc desc,
-        buffer_memory& mem,
-        vk_alloc alloc) NEX
+        void** p_mapped_data) NEX
 {
     buffer b{};
 
-    const u64 alignment = tinystd::max(desc.alignment, 8ull);
+    const u64 alignment = tinystd::max(desc.alignment, 4ull);
     const u64 size = tinystd::round_up(desc.size, alignment);
 
     VkBufferCreateInfo buffer_info { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     buffer_info.size = size;
     buffer_info.usage = VkBufferUsageFlags(desc.usage);
-    buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    buffer_info.sharingMode = VkSharingMode(!desc.queue_families.empty());
+    buffer_info.pQueueFamilyIndices = desc.queue_families.data();
 
     VmaAllocationCreateInfo alloc_info{};
-    alloc_info.usage = desc.mem_usage;
-
-    const bool gpu_only = desc.mem_usage == VMA_MEMORY_USAGE_GPU_ONLY
-            || desc.mem_usage == VMA_MEMORY_USAGE_GPU_LAZILY_ALLOCATED;
-
-    if (!gpu_only && desc.map_persistent)
-        alloc_info.flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT;
+    alloc_info.usage = VmaMemoryUsage(desc.mem_usage);
+    alloc_info.flags = desc.flags;
 
     VmaAllocationInfo info{};
-    vk_validate(vmaCreateBuffer(vma, &buffer_info, &alloc_info, &b.vk, &mem.vma_alloc, &info),
+    vk_validate(vmaCreateBuffer(vma, &buffer_info, &alloc_info, &b.vk, &vma_alloc, &info),
         "tinyvk::buffer::create - Failed to create buffer");
 
-    mem.data = (u8*)info.pMappedData;
-    mem.size = size;
+    if (p_mapped_data)
+        *p_mapped_data = info.pMappedData;
 
     return b;
 }
@@ -130,37 +123,37 @@ buffer::create(
 void
 buffer::destroy(
         VmaAllocator vma,
-        buffer_memory& mem,
-        vk_alloc alloc) NEX
+        VmaAllocation vma_alloc) NEX
 {
-    vmaDestroyBuffer(vma, vk, mem.vma_alloc);
+    vmaDestroyBuffer(vma, vk, vma_alloc);
     vk = {};
-    mem = {};
 }
 
 void
-buffer_memory::map(
-        VmaAllocator vma) NEX
+buffer::map(
+        VmaAllocator vma,
+        VmaAllocation vma_alloc,
+        void** p_mapped_data) NEX
 {
-    if (data) return;
-    vk_validate(vmaMapMemory(vma, vma_alloc, (void**)&data),
+    tassert(p_mapped_data && "tinyvk::buffer::map -  Must pass pointer to a pointer to buffer::map");
+    vk_validate(vmaMapMemory(vma, vma_alloc, p_mapped_data),
         "tinyvk::buffer::map - failed to map memory");
 }
 
 void
-buffer_memory::unmap(
-        VmaAllocator vma) NEX
+buffer::unmap(
+        VmaAllocator vma,
+        VmaAllocation vma_alloc) NEX
 {
-    if (data == nullptr) return;
     vmaUnmapMemory(vma, vma_alloc);
-    data = nullptr;
 }
 
 void
-buffer_memory::flush(
+buffer::flush(
         VmaAllocator vma,
+        VmaAllocation vma_alloc,
         u64 offset,
-        u64 s) const NEX
+        u64 s) NEX
 {
     vmaFlushAllocation(vma, vma_alloc, offset, s);
 }

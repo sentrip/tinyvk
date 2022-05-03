@@ -57,15 +57,18 @@ struct framebuffer;
 
 /// tinyvk_buffer.h
 struct buffer_desc;
-struct buffer_memory;
 struct buffer;
 
-/// tinyvk_image
+/// tinyvk_image.h
 struct image_desc;
-struct image_memory;
+struct image_dimensions;
 struct image;
 struct image_view_desc;
 struct image_view;
+
+/// tinyvk_pipeline.h
+struct pipeline_layout;
+struct pipeline;
 
 }
 

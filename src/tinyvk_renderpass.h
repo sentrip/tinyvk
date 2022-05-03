@@ -70,6 +70,18 @@ struct framebuffer : type_wrapper<framebuffer, VkFramebuffer> {
 
 
 /// renderpass high-level API
+struct default_renderpass_api_limits {
+    static constexpr size_t MAX_COLOR_ATTACHMENTS = 8;
+    static constexpr size_t MAX_RENDER_SUBPASSES = 16;
+    static constexpr size_t MAX_RENDER_SUBPASS_DEPENDENCIES = 16;
+};
+using renderpass_api_limits = TINYVK_RENDERPASS_API_LIMITS;
+
+enum order_t {
+    ORDER_BEFORE,
+    ORDER_AFTER
+};
+
 
 struct renderpass_desc::builder {
     struct subpass_h;
@@ -88,13 +100,14 @@ struct renderpass_desc::builder {
         subpass_h() = default;
         /// 2.1 associate attachments to subpasses
         void            input(attach_ref i) NEX;
-        void            output(attach_ref i) NEX;
+        void            output(attach_ref i, bool read = false) NEX;
         /// (optional) create explicit dependencies between subpasses
         void            depends_on(subpass_h& other) NEX;
         /// (optional) create explicit dependency to another renderpass
-        void            depends_external(
+        void            depends_external(order_t order,
                 VkPipelineStageFlags    src_stage, VkAccessFlags src_access,
-                VkPipelineStageFlags    dst_stage, VkAccessFlags dst_access) NEX;
+                VkPipelineStageFlags    dst_stage, VkAccessFlags dst_access,
+                VkDependencyFlags       dependencies = {}) NEX;
 
     /// This are implementation details
     private:
@@ -106,34 +119,56 @@ struct renderpass_desc::builder {
 
     /// This are implementation details
 private:
-    static constexpr size_t MAX_SUBPASSES       = MAX_RENDER_SUBPASSES;
-    static constexpr size_t MAX_DEPENDENCIES    = MAX_RENDER_SUBPASS_DEPENDENCIES;
-    static constexpr size_t MAX_ATTACH          = MAX_COLOR_ATTACHMENTS + 1;
+    static constexpr size_t MAX_SUBPASSES       = renderpass_api_limits::MAX_RENDER_SUBPASSES;
+    static constexpr size_t MAX_DEPENDENCIES    = renderpass_api_limits::MAX_RENDER_SUBPASS_DEPENDENCIES;
+    static constexpr size_t MAX_COLOR_ATTACH    = renderpass_api_limits::MAX_COLOR_ATTACHMENTS;
+    static constexpr size_t MAX_ATTACH          = renderpass_api_limits::MAX_COLOR_ATTACHMENTS + 1;
 
-    using subpass_attach                        = fixed_vector<VkAttachmentReference, MAX_COLOR_ATTACHMENTS>;
+    using subpass_attach                        = fixed_vector<VkAttachmentReference, MAX_COLOR_ATTACH>;
 
-    struct subpass_info {
-        fixed_vector<u8, MAX_COLOR_ATTACHMENTS>     inputs{};
-        fixed_vector<u8, MAX_COLOR_ATTACHMENTS>     outputs{};
-        fixed_vector<u8, MAX_SUBPASSES>             depends_on{};
-        subpass_attach                              input_attach{};
-        subpass_attach                              color_attach{};
-        subpass_attach                              resolve_attach{};
-        fixed_vector<u32, MAX_COLOR_ATTACHMENTS>    preserve_attach{};
-        VkAttachmentReference                       depth_attach{-1u};
-        u8                                          outputs_to_swapchain: 1;
-        u8                                          uses_aliased_attachment: 1;
-        u8                                          PAD: 6;
+    struct write_hazard {
+        enum Type: u8 { R_AFTER_W, W_AFTER_R, W_AFTER_W };
+        Type    type{};
+        u8      attach{};
+        u8      src{};
+        u8      dst{};
     };
 
-    void bake() NEX;
+    struct attach_info {
+        u8 resolve{255};
+        fixed_vector<u8, MAX_SUBPASSES>         readers{};
+        fixed_vector<u8, MAX_SUBPASSES>         writers{};
+    };
+
+    struct subpass_info {
+        fixed_vector<u8, MAX_COLOR_ATTACH>      inputs{};
+        fixed_vector<u8, MAX_COLOR_ATTACH>      outputs{};
+        subpass_attach                          input_attach{};
+        subpass_attach                          color_attach{};
+        subpass_attach                          resolve_attach{};
+        fixed_vector<u32, MAX_COLOR_ATTACH>     preserve_attach{};
+        VkAttachmentReference                   depth_attach{-1u};
+        bitset<2*MAX_ATTACH>                    read_write{};
+        u8                                      outputs_to_swapchain: 1;
+        u8                                      uses_aliased_attachment: 1;
+        u8                                      stage: 6;
+    };
+
+    void calculate_stages() NEX;
+    void add_swapchain_dependencies() NEX;
+    void add_explicit_dependencies() NEX;
+    void add_implicit_dependencies() NEX;
+    void add_preserve_attachments() NEX;
+    void fill_descriptions() NEX;
 
     fixed_vector<VkAttachmentDescription, 2 * MAX_ATTACH>           attachments{};
-    fixed_vector<fixed_vector<u8, MAX_SUBPASSES>, 2 * MAX_ATTACH>   readers{};
-    fixed_vector<fixed_vector<u8, MAX_SUBPASSES>, 2 * MAX_ATTACH>   writers{};
     fixed_vector<VkSubpassDependency, MAX_DEPENDENCIES>             dependencies{};
     fixed_vector<VkSubpassDescription, MAX_SUBPASSES>               subpasses{};
+    fixed_vector<write_hazard, 64>                                  hazards{};
+    fixed_vector<attach_info,  MAX_ATTACH>                          attach_infos{};
     fixed_vector<subpass_info, MAX_SUBPASSES>                       subpass_infos{};
+    fixed_vector<fixed_vector<u8, MAX_SUBPASSES>, MAX_SUBPASSES>    subpass_depends{};
+    fixed_vector<fixed_vector<u8, MAX_SUBPASSES>, MAX_SUBPASSES>    stages{};
     bool                                                            baked{};
 };
 
@@ -159,7 +194,20 @@ renderpass::create(
         renderpass_desc desc,
         vk_alloc alloc) NEX
 {
-    return renderpass{};
+    renderpass r{};
+
+    VkRenderPassCreateInfo info{VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
+    info.pAttachments = desc.attach.data();
+    info.attachmentCount = desc.attach.size();
+    info.pDependencies = desc.dependencies.data();
+    info.dependencyCount = desc.dependencies.size();
+    info.pSubpasses = desc.subpasses.data();
+    info.subpassCount = desc.subpasses.size();
+
+    vk_validate(vkCreateRenderPass(device, &info, alloc, &r.vk),
+        "tinyvk::renderpass::create - failed to create render pass");
+
+    return r;
 }
 
 void
@@ -208,6 +256,18 @@ framebuffer::destroy(
 
 //region renderpass_desc::builder
 
+/** Using the same attachment as an input and an output in a single subpass
+If a subpass uses the same attachment as both an input attachment and either a color attachment or a depth/stencil attachment,
+writes via the color or depth/stencil attachment are not automatically made visible to reads via the input attachment,
+causing a feedback loop, except in any of the following conditions:
+    - If the color components or depth/stencil components read by the input attachment are mutually exclusive with
+      the components written by the color or depth/stencil attachments, then there is no feedback loop. This requires the graphics pipelines
+      used by the subpass to disable writes to color components that are read as inputs via the colorWriteEnable or colorWriteMask,
+      and to disable writes to depth/stencil components that are read as inputs via depthWriteEnable or stencilTestEnable.
+    - If the attachment is used as an input attachment and depth/stencil attachment only, and the depth/stencil attachment is not written to.
+
+ */
+
 static bool is_depth_layout(VkImageLayout layout)
 {
     return layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
@@ -216,48 +276,57 @@ static bool is_depth_layout(VkImageLayout layout)
         || layout == VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL;
 }
 
-static VkAttachmentReference make_ref(u32 i, VkImageLayout layout) NEX
+static VkAttachmentReference make_ref(u32 i, VkImageLayout layout, bool input) NEX
 {
-    return {i, layout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : layout};
+    if (input) {
+        return {i, is_depth_layout(layout) ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+    } else {
+        return {i, layout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : layout};
+    }
 }
 
 void renderpass_desc::builder::subpass_h::depends_on(subpass_h& other) NEX
 {
-    b->subpass_infos[handle].depends_on.push_back(u8(other.handle));
+    b->subpass_depends[handle].push_back(u8(other.handle));
 }
 
-void renderpass_desc::builder::subpass_h::depends_external(VkPipelineStageFlags src_stage, VkAccessFlags src_access,
-                                                           VkPipelineStageFlags dst_stage, VkAccessFlags dst_access) NEX
+void renderpass_desc::builder::subpass_h::depends_external(
+        order_t order,
+        VkPipelineStageFlags src_stage, VkAccessFlags src_access,
+        VkPipelineStageFlags dst_stage, VkAccessFlags dst_access,
+        VkDependencyFlags d) NEX
 {
     VkSubpassDependency dep{};
-    dep.srcSubpass          = VK_SUBPASS_EXTERNAL;
-    dep.dstSubpass          = handle;
+    dep.srcSubpass          = order == ORDER_BEFORE ? VK_SUBPASS_EXTERNAL : handle;
+    dep.dstSubpass          = order == ORDER_BEFORE ? handle : VK_SUBPASS_EXTERNAL;
     dep.srcStageMask        = src_stage;
     dep.srcAccessMask       = src_access;
     dep.dstStageMask        = dst_stage;
     dep.dstAccessMask       = dst_access;
+    dep.dependencyFlags     = d;
     b->dependencies.push_back(dep);
 }
 
 void renderpass_desc::builder::subpass_h::input(attach_ref i) NEX
 {
-    b->readers[i].push_back(u8(handle));
+    b->attach_infos[i].readers.push_back(u8(handle));
     auto& si = b->subpass_infos[handle];
     si.inputs.push_back(u8(i));
-    si.input_attach.push_back(make_ref(i, b->attachments[i].finalLayout));
+    si.input_attach.push_back(make_ref(i, b->attachments[i].finalLayout, true));
     si.uses_aliased_attachment |= u8((b->attachments[i].flags & VK_ATTACHMENT_DESCRIPTION_MAY_ALIAS_BIT) != 0);
 }
 
-void renderpass_desc::builder::subpass_h::output(attach_ref i) NEX
+void renderpass_desc::builder::subpass_h::output(attach_ref i, bool read) NEX
 {
     auto& a = b->attachments[i];
     auto& si = b->subpass_infos[handle];
-    b->writers[i].push_back(u8(handle));
+    b->attach_infos[i].writers.push_back(u8(handle));
+    si.read_write.set(i, read);
     si.outputs.push_back(u8(i));
     si.outputs_to_swapchain |= u8(a.finalLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
     si.uses_aliased_attachment |= u8((a.flags & VK_ATTACHMENT_DESCRIPTION_MAY_ALIAS_BIT) != 0);
 
-    auto ref = make_ref(i, a.finalLayout);
+    auto ref = make_ref(i, a.finalLayout, false);
     if (is_depth_layout(a.finalLayout)) {
         if (si.depth_attach.attachment != -1u) {
             tinystd::error("Each subpass can only output to a single depth buffer");
@@ -267,8 +336,12 @@ void renderpass_desc::builder::subpass_h::output(attach_ref i) NEX
     }
     else {
         si.color_attach.push_back(ref);
+        // if the attachment is multi-sampled, add reference to the attachment that resolves the multisampled input
         if (a.samples != VK_SAMPLE_COUNT_1_BIT)
-            si.resolve_attach.push_back(make_ref(i + 1, a.finalLayout));
+            si.resolve_attach.push_back(make_ref(i + 1, a.finalLayout, false));
+        // if the subpass uses multi-sampled attachments then we need an unused attachment in the corresponding position
+        else if (tinystd::any_of(si.outputs.begin(), si.outputs.end(), [&](auto at){ return b->attach_infos[at].resolve != 255; }))
+            si.resolve_attach.push_back(make_ref(VK_ATTACHMENT_UNUSED, VK_IMAGE_LAYOUT_UNDEFINED, false));
     }
 }
 
@@ -276,12 +349,12 @@ renderpass_desc::builder::attach_ref renderpass_desc::builder::attach(const VkAt
 {
     const u32 i = attachments.size();
     attachments.push_back(desc);
-    readers.push_back({});
-    writers.push_back({});
+    attach_infos.push_back({});
     if (desc.samples != VK_SAMPLE_COUNT_1_BIT) {
+        attach_infos[i].resolve = attachments.size();
         attachments.push_back(desc);
         attachments.back().samples = VK_SAMPLE_COUNT_1_BIT;
-        // TODO: Do resolve attachments require/allow different load/store parameters from the attachment they are resolving?
+        attachments.back().loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     }
     return i;
 }
@@ -291,6 +364,7 @@ renderpass_desc::builder::subpass_h renderpass_desc::builder::subpass(pipeline_t
     const u32 i = subpasses.size();
     subpasses.push_back({0u, VkPipelineBindPoint(type)});
     subpass_infos.push_back({});
+    subpass_depends.push_back({});
     subpass_infos.back().outputs_to_swapchain = 0;
     subpass_infos.back().uses_aliased_attachment = 0;
     return subpass_h{*this, i};
@@ -299,7 +373,12 @@ renderpass_desc::builder::subpass_h renderpass_desc::builder::subpass(pipeline_t
 renderpass_desc renderpass_desc::builder::build() NEX
 {
     if (!baked) {
-        bake();
+        calculate_stages();
+        add_swapchain_dependencies();
+        add_explicit_dependencies();
+        add_implicit_dependencies();
+        add_preserve_attachments();
+        fill_descriptions();
         baked = true;
     }
     renderpass_desc desc{};
@@ -309,25 +388,103 @@ renderpass_desc renderpass_desc::builder::build() NEX
     return desc;
 }
 
-void renderpass_desc::builder::bake() NEX
+void renderpass_desc::builder::calculate_stages() NEX
 {
-    // swapchain dependencies
+    // get initial stages from explicit dependencies
+    fixed_vector<fixed_vector<u8, MAX_SUBPASSES>, MAX_SUBPASSES> explicit_stages{};
+    tinystd::dependencies::calculate(subpass_depends, explicit_stages);
+    for (u32 stage = 0; stage < explicit_stages.size(); ++stage) {
+        for (auto s: explicit_stages[stage]) {
+            subpass_infos[s].stage = stage;
+        }
+    }
+
+    // calculate write hazards and modify initial stages
+    u8 max_stage{};
+    for (u32 a = 0; a < attachments.size(); ++a) {
+        for (u32 s0 = 0; s0 < subpasses.size(); ++s0) {
+            auto& sp0 = subpass_infos[s0];
+            // subpass 0 read/write
+            const bool s0_reads = tinystd::contains(sp0.inputs, u8(a));
+            const bool s0_writes = tinystd::contains(sp0.outputs, u8(a));
+            if (!s0_reads && !s0_writes)
+                continue;
+
+            for (u32 s1 = 0; s1 < subpasses.size(); ++s1) {
+                auto& sp1 = subpass_infos[s1];
+                if (s0 == s1)
+                    continue; // assert same read/write properties?
+
+                // subpass 1 read/write
+                const bool s1_reads = tinystd::contains(sp1.inputs, u8(a));
+                const bool s1_writes = tinystd::contains(sp1.outputs, u8(a));
+                if (!s1_reads && !s1_writes)
+                    continue;
+
+                // if neither subpass writes then we do not need a dependency
+                if (!s0_writes && !s1_writes)
+                    continue;
+
+                // ensure subpasses do not share stage
+                if (sp0.stage == sp1.stage) {
+                    const u8 st = ++((s0 < s1 ? sp1 : sp0).stage);
+                    max_stage = tinystd::max(max_stage, st);
+                }
+
+                // create hazard
+                write_hazard u{};
+                u.attach = a;
+                u.src = tinystd::min(s0, s1);
+                u.dst = tinystd::max(s0, s1);
+                bool reads [2]{ s0 < s1 ? s0_reads  : s1_reads , s0 < s1 ? s1_reads  : s0_reads };
+                bool writes[2]{ s0 < s1 ? s0_writes : s1_writes, s0 < s1 ? s1_writes : s0_writes };
+                if      (writes[0] && writes[1]) u.type = write_hazard::W_AFTER_W;
+                else if (writes[0] &&  reads[1]) u.type = write_hazard::R_AFTER_W;
+                else if ( reads[0] && writes[1]) u.type = write_hazard::W_AFTER_R;
+                else                             tassert(false && "tinyvk::renderpass_desc::builder::build - Invalid usage");
+
+                if (tinystd::find_if(hazards.begin(), hazards.end(),
+                    [&u](auto& v){ return v.attach == u.attach && v.src == u.src && v.dst == u.dst; }) == hazards.end())
+                {
+                    hazards.push_back(u);
+                }
+            }
+        }
+    }
+
+    // record final stages per subpass
+    stages.resize(max_stage + 1);
+    for (u32 i = 0; i < subpasses.size(); ++i)
+        stages[subpass_infos[i].stage].push_back(i);
+}
+
+void renderpass_desc::builder::add_swapchain_dependencies() NEX
+{
     for (u32 i = 0; i < subpasses.size(); ++i) {
         if (!subpass_infos[i].outputs_to_swapchain) continue;
         VkSubpassDependency dep{};
         dep.srcSubpass          = VK_SUBPASS_EXTERNAL;
         dep.dstSubpass          = i;
         dep.srcStageMask        = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        dep.srcAccessMask       = {};
         dep.dstStageMask        = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        dep.dstAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        dep.srcAccessMask       = VK_ACCESS_MEMORY_READ_BIT;
+        dep.dstAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        dep.dependencyFlags     = VK_DEPENDENCY_BY_REGION_BIT;
+        dependencies.push_back(dep);
+        dep.srcSubpass          = i;
+        dep.dstSubpass          = VK_SUBPASS_EXTERNAL;
+        dep.srcStageMask        = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        dep.dstStageMask        = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;;
+        dep.srcAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        dep.dstAccessMask       = VK_ACCESS_MEMORY_READ_BIT;
         dependencies.push_back(dep);
     }
+}
 
-    // explicit dependencies
+void renderpass_desc::builder::add_explicit_dependencies() NEX
+{
     for (u32 i = 0; i < subpasses.size(); ++i) {
-        auto& si = subpass_infos[i];
-        for (auto depends_on: si.depends_on) {
+        for (auto depends_on: subpass_depends[i]) {
             VkSubpassDependency dep{};
             dep.srcSubpass      = u32(depends_on);
             dep.dstSubpass      = i;
@@ -339,65 +496,93 @@ void renderpass_desc::builder::bake() NEX
             dependencies.push_back(dep);
         }
     }
+}
 
-    // preserve attachments and implicit subpass dependencies
-    // for every resource R used in pass X, R must be preserve attachment in all passes:
-    //      which do not read/write R and come after the last write to R and before the first read of R
-    // for every resource R written to in pass X, R must have a read-after-write dependency in all passes:
-    //      which read from R before the next write to R
-    for (u32 i = 0; i < attachments.size(); ++i) {
-        auto& w = writers[i];
-        auto& r = readers[i];
-        if (w.empty() || r.empty()) continue;
+void renderpass_desc::builder::add_implicit_dependencies() NEX
+{
+    for (auto& u: hazards) {
+        const bool uses_alias = subpass_infos[u.src].uses_aliased_attachment || subpass_infos[u.dst].uses_aliased_attachment;
+        const bool is_depth = is_depth_layout(attachments[u.attach].finalLayout);
 
-        u32 w_offset = 0;
-        for (;;) {
-            // Current write
-            const auto* p_write = tinystd::min_element(w.begin() + w_offset, w.end());
-            // No more writers, done with preserve attachments
-            if (p_write == w.end()) break;
-            w_offset = p_write - w.begin();
-            const u8 write = *p_write;
-            // Next write
-            const auto* p_next_write = tinystd::min_element(w.begin() + w_offset, w.end());
-            const u8 next_write = p_next_write != w.end() ? *p_next_write : subpasses.size();
-            // Last read before next write
-            const auto* p_last_read = tinystd::find_element(r.begin(), r.end(), [&](auto v, auto a){ return v > a && v < next_write; });
-            // No more readers, continue to next write
-            if (p_last_read == r.end()) continue;
-            const u8 last_read = *p_last_read;
+        VkSubpassDependency dep{};
+        dep.srcSubpass = u.src;
+        dep.dstSubpass = u.dst;
+        dep.dependencyFlags = uses_alias ? 0 : VK_DEPENDENCY_BY_REGION_BIT;
 
-            // For each subpass after current write and before last read that does not use the attachment, add preserve attachment
-            for (u8 s = write + 1; s < last_read; ++s) {
-                auto& si = subpass_infos[s];
-                if (tinystd::find(si.inputs.begin(), si.inputs.end(), u8(i)) == si.inputs.end())
-                    subpass_infos[s].preserve_attach.push_back(i);
+        const bool src_rw = subpass_infos[u.src].read_write.test(u.attach);
+        const bool dst_rw = subpass_infos[u.dst].read_write.test(u.attach);
+
+        auto color_stage        = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        auto depth_read_stage   = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        auto depth_write_stage  = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        auto depth_rw_stage     = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+        auto read_access        = VK_ACCESS_SHADER_READ_BIT;
+        auto color_write_access = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        auto color_rw_access    = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        auto depth_write_access = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        auto depth_rw_access    = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+        // TODO: tinyvk::renderpass_desc::builder::bake - verify implicit subpass dependencies color/depth read/write combinations
+        switch (u.type) {
+            case write_hazard::R_AFTER_W: {
+                dep.srcStageMask    = is_depth ? (src_rw ? depth_rw_stage  : depth_write_stage)  : color_stage;
+                dep.dstStageMask    = is_depth ? (dst_rw ? depth_rw_stage  : depth_read_stage)   : color_stage;
+                dep.srcAccessMask   = is_depth ? (src_rw ? depth_rw_access : depth_write_access) : (src_rw ? color_rw_access : color_write_access);
+                dep.dstAccessMask   = read_access;
+                break;
             }
+            case write_hazard::W_AFTER_R: {
+                dep.srcStageMask    = is_depth ? (src_rw ? depth_rw_stage  : depth_read_stage)   : color_stage;
+                dep.dstStageMask    = is_depth ? (dst_rw ? depth_rw_stage  : depth_write_stage)  : color_stage;
+                dep.srcAccessMask   = read_access;
+                dep.dstAccessMask   = is_depth ? (dst_rw ? depth_rw_access : depth_write_access) : (dst_rw ? color_rw_access : color_write_access);
+                break;
+            }
+            case write_hazard::W_AFTER_W: {
+                if (!dst_rw) continue;
+                dep.srcStageMask    = is_depth ? (src_rw ? depth_rw_stage  : depth_write_stage)  : color_stage;
+                dep.dstStageMask    = is_depth ? (dst_rw ? depth_rw_stage  : depth_write_stage)  : color_stage;
+                dep.srcAccessMask   = is_depth ? (src_rw ? depth_rw_access : depth_write_access) : (src_rw ? color_rw_access : color_write_access);;
+                dep.dstAccessMask   = is_depth ? (dst_rw ? depth_rw_access : depth_write_access) : (dst_rw ? color_rw_access : color_write_access);
+                break;
+            }
+            default: tassert(false && "tinyvk::renderpass_desc::builder::build - Invalid usage"); break;
+        }
 
-            // For each subpass after current write and up to the last read that uses the attachment, add dependency
-            for (u8 s = write + 1; s <= last_read; ++s) {
-                auto& si = subpass_infos[s];
-                if (tinystd::find(si.inputs.begin(), si.inputs.end(), u8(i)) != si.inputs.end()) {
-                    const bool uses_alias = si.uses_aliased_attachment || subpass_infos[write].uses_aliased_attachment;
-                    VkSubpassDependency dep{};
-                    dep.srcSubpass      = u32(write);
-                    dep.dstSubpass      = u32(s);
-                    // TODO: tinyvk::renderpass_desc::builder::bake - verify implicit subpass dependencies color/depth read/write combinations
-                    const bool is_depth = is_depth_layout(attachments[i].finalLayout);
-                    dep.srcStageMask    = is_depth ? VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT : VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-                    dep.srcAccessMask   = is_depth ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-                    dep.dstStageMask    = is_depth ? VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT : VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-                    dep.dstAccessMask   = is_depth ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT : VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
-                    dep.dependencyFlags = uses_alias ? 0 : VK_DEPENDENCY_BY_REGION_BIT;
-                    auto& dp = dependencies;
-                    if (tinystd::find_if(dp.begin(), dp.end(), [&dep](auto& d){ return tinystd::memeq(&dep, &d, sizeof(dep)); }) != dp.end())
-                        dp.push_back(dep);
+        if (tinystd::find_if(dependencies.begin(), dependencies.end(),
+            [&dep](auto& d){ return tinystd::memeq(&dep, &d, sizeof(dep)); }) == dependencies.end())
+        {
+            dependencies.push_back(dep);
+        }
+    }
+}
+
+void renderpass_desc::builder::add_preserve_attachments() NEX
+{
+    for (auto& u: hazards) {
+        if (u.type != write_hazard::R_AFTER_W) continue;
+        auto& src = subpass_infos[u.src];
+        auto& dst = subpass_infos[u.dst];
+        // TODO: Does just one subpass need to preserve per stage or is it all the subpasses in the stage that form part of the attachment's dependency chain
+        // each attachment that is written in stage S and read in stage R must be preserved by
+        // at least one subpass in every stage after S and before R
+        for (u32 stage = src.stage + 1; stage <= dst.stage - (dst.stage > 0); ++stage) {
+            for (auto s: stages[stage]) {
+                auto& sp = subpass_infos[s];
+                if (!tinystd::contains(sp.inputs, u.attach)
+                    && !tinystd::contains(sp.outputs, u.attach)
+                    && !tinystd::contains(sp.preserve_attach, u.attach))
+                {
+                    sp.preserve_attach.push_back(u.attach);
+                    break;
                 }
             }
         }
     }
+}
 
-    // fill in description structs
+void renderpass_desc::builder::fill_descriptions() NEX
+{
     for (u32 i = 0; i < subpasses.size(); ++i) {
         auto& s = subpasses[i];
         auto& si = subpass_infos[i];

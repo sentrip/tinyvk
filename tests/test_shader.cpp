@@ -4,6 +4,7 @@
 
 #include "catch.hpp"
 
+#include <cstring>
 #include "tinyvk_shader.h"
 
 static constexpr const char* SRC = R"(
@@ -45,5 +46,5 @@ TEST_CASE("Shader preprocess - cpp", "[tinyvk]")
 {
     tinystd::stack_vector<char, 1024> out;
     tinyvk::preprocess_shader_cpp({MACRO_SRC, strlen(MACRO_SRC)}, out, {});
-    REQUIRE( memcmp(out.data(), "#version 450\na a b b", out.size()) == 0 );
+    REQUIRE( memcmp(out.data(), "#version 450\na a b b\n", out.size()) == 0 );
 }

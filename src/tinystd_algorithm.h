@@ -89,6 +89,7 @@ constexpr bool all_of(It begin, It end, F&& cond)
 template<typename It, typename Compare>
 constexpr It find_element(It begin, It end, Compare&& compare) noexcept
 {
+    if ((end - begin) == 1) return begin;
     It v = begin, result = end;
     for (auto it = begin; it != end; ++it)
         if (compare(*it, *v))
@@ -108,6 +109,13 @@ template<typename It>
 constexpr It max_element(It begin, It end) noexcept
 {
     return find_element(begin, end, [](const auto& v, const auto& a){ return v > a; });
+}
+
+
+template<typename C, typename V>
+constexpr bool contains(const C& container, const V& value)
+{
+    return find(container.begin(), container.end(), value) != container.end();
 }
 
 
@@ -271,6 +279,72 @@ struct monotonic_increasing_string {
     }
 };
 
+}
+
+// integer-vector dependencies
+namespace tinystd {
+namespace dependencies {
+
+template<typename T, size_t NOuter, size_t NInner>
+using vec_vec = stack_vector<stack_vector<T, NInner>, NOuter>;
+
+
+template<typename T, size_t Nodes, size_t Deps>
+constexpr bool calculate(const vec_vec<T, Nodes, Deps>& graph, vec_vec<T, Nodes, Nodes>& stages)
+{
+    const size_t n_nodes = graph.size();
+
+    // nodes without dependencies must have a count of 1 to start
+    u64 counts[Nodes]{};
+    u64 new_counts[Nodes]{};
+    for (size_t i = 0; i < n_nodes; ++i)
+        if (graph[i].empty())
+            counts[i] = 1;
+
+    // repeat for n_nodes iterations
+    //      for each node in the graph
+    //          sum counts of dependant nodes into new_counts
+    for (size_t i = 0; i < n_nodes; ++i) {
+        memcpy(new_counts, counts, sizeof(new_counts));
+        for (size_t v = 0; v < n_nodes; ++v)
+            for (auto d: graph[v])
+                new_counts[v] += (counts[d] << 1);
+        memcpy(counts, new_counts, sizeof(new_counts));
+    }
+
+    // create stages
+    size_t done_count{};
+    bitset<Nodes> done{};
+    stack_vector<T, Nodes> stage{};
+    while (done_count < n_nodes) {
+        // get minimum count that is not done
+        size_t min_i{-1ul};
+        u64 min_count{-1ul};
+        for (size_t i = 0; i < n_nodes; ++i) {
+            if (done.test(i)) continue;
+            if (counts[i] < min_count) {
+                min_i = i;
+                min_count = counts[i];
+            }
+        }
+        tassert(min_i != -1ul);
+
+        // get all nodes that share the count
+        for (size_t i = 0; i < n_nodes; ++i)
+            if (counts[i] == counts[min_i])
+                stage.push_back(T(i));
+
+        // add stage with nodes and update done info
+        stages.push_back(stage);
+        done_count += stage.size();
+        for (auto s: stage) done.set(s, true);
+        stage.clear();
+    }
+
+    return true;
+}
+
+}
 }
 
 #endif //TINYSTD_ALGORITHM_H

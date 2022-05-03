@@ -60,7 +60,7 @@ struct image_view : type_wrapper<image_view, VkImageView> {
             VkDevice                    device,
             image_view_desc             desc,
             VkImage                     image,
-            const image_memory&         mem,
+            const image_dimensions&     dim,
             vk_alloc                    alloc = {}) NEX;
 
     void                            destroy(
@@ -76,7 +76,7 @@ struct image_view : type_wrapper<image_view, VkImageView> {
 
 #ifdef TINYVK_USE_VMA
 
-struct image_memory {
+struct image_dimensions {
     u32                 width{};
     u32                 height{};
     u32                 depth{};
@@ -84,7 +84,6 @@ struct image_memory {
     u32                 is_cubemap: 1;
     u32                 mip_levels: 31;
     VkFormat            format{};
-    VmaAllocation       vma_alloc{};
 };
 
 
@@ -92,19 +91,20 @@ struct image : type_wrapper<image, VkImage> {
 
     static image                    create(
             VmaAllocator                vma,
+            VmaAllocation&              vma_alloc,
             image_desc                  desc,
-            image_memory&               mem,
+            image_dimensions*           dim = {},
             vk_alloc                    alloc = {}) NEX;
 
     void                            destroy(
             VmaAllocator                vma,
-            image_memory&               mem,
+            VmaAllocation               vma_alloc,
             vk_alloc                    alloc = {}) NEX;
 
     image_view                      create_view(
             VkDevice                    device,
             image_view_desc             desc,
-            const image_memory&         mem,
+            const image_dimensions&     dim,
             vk_alloc                    alloc = {}) NEX;
 
     static VkImageAspectFlagBits    determine_aspect_mask(
@@ -135,8 +135,9 @@ namespace tinyvk {
 image
 image::create(
         VmaAllocator vma,
+        VmaAllocation& vma_alloc,
         image_desc desc,
-        image_memory& mem,
+        image_dimensions* dim,
         vk_alloc alloc) NEX
 {
     if (desc.size.width > 1 && desc.size.height > 1 && desc.size.depth > 1 && desc.size.array_layers > 1) {
@@ -174,17 +175,18 @@ image::create(
     VmaAllocationCreateInfo info{};
     // TODO: CPU-visible images?
     info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    vk_validate(vmaCreateImage(vma, &im_info, &info, &im.vk, &mem.vma_alloc, nullptr),
+    vk_validate(vmaCreateImage(vma, &im_info, &info, &im.vk, &vma_alloc, nullptr),
         "tinyvk::image::create - failed to create image");
 
-    mem.format = desc.format;
-    mem.width = desc.size.width;
-    mem.height = desc.size.height;
-    mem.depth = desc.size.depth;
-    mem.array_layers = desc.size.array_layers;
-    mem.mip_levels = desc.size.mip_levels;
-    mem.is_cubemap = desc.cubemap;
-
+    if (dim) {
+        dim->format = desc.format;
+        dim->width = desc.size.width;
+        dim->height = desc.size.height;
+        dim->depth = desc.size.depth;
+        dim->array_layers = desc.size.array_layers;
+        dim->mip_levels = desc.size.mip_levels;
+        dim->is_cubemap = desc.cubemap;
+    }
     return im;
 }
 
@@ -192,12 +194,11 @@ image::create(
 void
 image::destroy(
         VmaAllocator vma,
-        image_memory& mem,
+        VmaAllocation vma_alloc,
         vk_alloc alloc) NEX
 {
-    vmaDestroyImage(vma, vk, mem.vma_alloc);
+    vmaDestroyImage(vma, vk, vma_alloc);
     vk = {};
-    mem = {};
 }
 
 #else
@@ -208,10 +209,10 @@ image_view
 image::create_view(
         VkDevice device,
         image_view_desc desc,
-        const image_memory& mem,
+        const image_dimensions& dim,
         vk_alloc alloc) NEX
 {
-    return image_view::create(device, desc, vk, mem, alloc);
+    return image_view::create(device, desc, vk, dim, alloc);
 }
 
 
@@ -256,21 +257,21 @@ image_view::create(
         VkDevice device,
         image_view_desc desc,
         VkImage image,
-        const image_memory& mem,
+        const image_dimensions& dim,
         vk_alloc alloc) NEX
 {
     image_view v;
 
-    const VkImageType image_type = mem.height == 1
+    const VkImageType image_type = dim.height == 1
             ? VK_IMAGE_TYPE_1D
-            : (mem.depth == 1 ? VK_IMAGE_TYPE_2D : VK_IMAGE_TYPE_3D);
+            : (dim.depth == 1 ? VK_IMAGE_TYPE_2D : VK_IMAGE_TYPE_3D);
 
     VkImageViewCreateInfo view_info{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
     view_info.image = image;
-    view_info.format = mem.format;
+    view_info.format = dim.format;
     view_info.components = desc.components;
-    view_info.viewType = image_view::determine_type(image_type, mem.array_layers, bool(mem.is_cubemap));
-    view_info.subresourceRange.aspectMask = image::determine_aspect_mask(mem.format, false);
+    view_info.viewType = image_view::determine_type(image_type, dim.array_layers, bool(dim.is_cubemap));
+    view_info.subresourceRange.aspectMask = image::determine_aspect_mask(dim.format, false);
     view_info.subresourceRange.baseMipLevel = desc.mip_level;
     view_info.subresourceRange.levelCount = desc.level_count;
     view_info.subresourceRange.baseArrayLayer = desc.array_layer;

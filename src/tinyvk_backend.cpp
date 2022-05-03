@@ -7,8 +7,65 @@
 #include "vk_mem_alloc.h"
 #include <cstdio>
 
-
+//#define TINYVK_BACKEND_TEST
 #ifdef TINYVK_BACKEND_TEST
+
+#include "tinyvk_core.h"
+
+namespace tinyvk::backend {
+
+
+template<typename VkT, typename Desc>
+struct description_allocator {
+    tinystd::stack_vector<Desc, 8> desc{};
+    tinystd::stack_vector<uint32_t, 8> free_slots{};
+    uint32_t count{1};
+
+    VkT alloc(const Desc& d) {
+        if (!free_slots.empty()) {
+            auto slot = free_slots.back();
+            free_slots.pop_back();
+            return (VkT)(uint64_t(slot));
+        } else {
+            auto slot = count++;
+            if (slot > desc.size()) desc.resize(slot + 1);
+            desc[slot] = d;
+            return (VkT)(uint64_t(slot));
+        }
+    }
+
+    void free(VkT ptr) {
+        free_slots.push_back(uint32_t(uint64_t(ptr)));
+    }
+};
+
+
+struct StaticInfo {
+    debug_flags debug{};
+    struct {
+        description_allocator<VkInstance, VkInstanceCreateInfo>         instance{};
+        description_allocator<VkDevice, VkDeviceCreateInfo>             device{};
+        description_allocator<VkRenderPass, VkRenderPassCreateInfo>     renderpass{};
+        description_allocator<VkFramebuffer, VkFramebufferCreateInfo>   framebuffer{};
+    } alloc{};
+};
+
+static StaticInfo info{};
+
+void set_debug(debug_flags debug) {
+    info.debug = debug;
+}
+
+const VkInstanceCreateInfo&     get_desc(VkInstance v)      { return info.alloc.instance.desc[uint64_t(v)]; }
+const VkDeviceCreateInfo&       get_desc(VkDevice v)        { return info.alloc.device.desc[uint64_t(v)]; }
+const VkRenderPassCreateInfo&   get_desc(VkRenderPass v)    { return info.alloc.renderpass.desc[uint64_t(v)]; }
+const VkFramebufferCreateInfo&  get_desc(VkFramebuffer v)   { return info.alloc.framebuffer.desc[uint64_t(v)]; }
+
+}
+
+bool test_debug(tinyvk::backend::debug_flags d) {
+    return (tinyvk::backend::info.debug & d) != 0;
+}
 
 //region Instance/Device
 
@@ -17,6 +74,10 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateInstance(
     const VkAllocationCallbacks*                pAllocator,
     VkInstance*                                 pInstance)
 {
+    *pInstance = tinyvk::backend::info.alloc.instance.alloc(*pCreateInfo);
+    if (test_debug(tinyvk::backend::device)) {
+        printf("vkCreateInstance (0x%lx)\n", uint64_t(*pInstance));
+    }
     return VK_SUCCESS;
 }
 
@@ -24,7 +85,10 @@ VKAPI_ATTR void VKAPI_CALL vkDestroyInstance(
     VkInstance                                  instance,
     const VkAllocationCallbacks*                pAllocator)
 {
-
+    tinyvk::backend::info.alloc.instance.free(instance);
+    if (test_debug(tinyvk::backend::device)) {
+        printf("vkDestroyInstance (0x%lx)\n", uint64_t(instance));
+    }
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL vkEnumeratePhysicalDevices(
@@ -96,6 +160,10 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateDevice(
     const VkAllocationCallbacks*                pAllocator,
     VkDevice*                                   pDevice)
 {
+    *pDevice = tinyvk::backend::info.alloc.device.alloc(*pCreateInfo);
+    if (test_debug(tinyvk::backend::device)) {
+        printf("vkCreateDevice (0x%lx)\n", uint64_t(*pDevice));
+    }
     return VK_SUCCESS;
 }
 
@@ -103,7 +171,10 @@ VKAPI_ATTR void VKAPI_CALL vkDestroyDevice(
     VkDevice                                    device,
     const VkAllocationCallbacks*                pAllocator)
 {
-
+    tinyvk::backend::info.alloc.device.free(device);
+    if (test_debug(tinyvk::backend::device)) {
+        printf("vkDestroyDevice (0x%lx)\n", uint64_t(device));
+    }
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL vkEnumerateDeviceExtensionProperties(
@@ -557,10 +628,12 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateDescriptorSetLayout(
     const VkAllocationCallbacks*                pAllocator,
     VkDescriptorSetLayout*                      pSetLayout)
 {
-    printf("vkCreateDescriptorSetLayout (%u) - \n", pCreateInfo->bindingCount);
-    for (uint32_t i = 0; i < pCreateInfo->bindingCount; ++i) {
-        auto& b = pCreateInfo->pBindings[i];
-        printf("-    bind: %u, type: %u, count: %u\n", b.binding, b.descriptorType, b.descriptorCount);
+    if (test_debug(tinyvk::backend::descriptor_set_layout)) {
+        printf("vkCreateDescriptorSetLayout (0x%lx) - (%u) bindings\n", uint64_t(*pSetLayout), pCreateInfo->bindingCount);
+        for (uint32_t i = 0; i < pCreateInfo->bindingCount; ++i) {
+            auto& b = pCreateInfo->pBindings[i];
+            printf("-    bind: %u, type: %u, count: %u\n", b.binding, b.descriptorType, b.descriptorCount);
+        }
     }
     return VK_SUCCESS;
 }
@@ -570,7 +643,9 @@ VKAPI_ATTR void VKAPI_CALL vkDestroyDescriptorSetLayout(
     VkDescriptorSetLayout                       descriptorSetLayout,
     const VkAllocationCallbacks*                pAllocator)
 {
-
+    if (test_debug(tinyvk::backend::descriptor_set_layout)) {
+        printf("vkDestroyDescriptorSetLayout (0x%lx)\n", uint64_t(descriptorSetLayout));
+    }
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL vkCreateDescriptorPool(
@@ -579,7 +654,9 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateDescriptorPool(
     const VkAllocationCallbacks*                pAllocator,
     VkDescriptorPool*                           pDescriptorPool)
 {
-    *pDescriptorPool = VkDescriptorPool(1);
+    if (test_debug(tinyvk::backend::descriptor_pool)) {
+        printf("vkCreateDescriptorPool (0x%lx)\n", uint64_t(*pDescriptorPool));
+    }
     return VK_SUCCESS;
 }
 
@@ -588,7 +665,9 @@ VKAPI_ATTR void VKAPI_CALL vkDestroyDescriptorPool(
     VkDescriptorPool                            descriptorPool,
     const VkAllocationCallbacks*                pAllocator)
 {
-
+    if (test_debug(tinyvk::backend::descriptor_pool)) {
+        printf("vkDestroyDescriptorPool (0x%lx)\n", uint64_t(descriptorPool));
+    }
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL vkResetDescriptorPool(
@@ -604,8 +683,6 @@ VKAPI_ATTR VkResult VKAPI_CALL vkAllocateDescriptorSets(
     const VkDescriptorSetAllocateInfo*          pAllocateInfo,
     VkDescriptorSet*                            pDescriptorSets)
 {
-    for (uint64_t i = 0; i < pAllocateInfo->descriptorSetCount; ++i)
-        pDescriptorSets[i] = VkDescriptorSet(i + 1);
     return VK_SUCCESS;
 }
 
@@ -625,14 +702,16 @@ VKAPI_ATTR void VKAPI_CALL vkUpdateDescriptorSets(
     uint32_t                                    descriptorCopyCount,
     const VkCopyDescriptorSet*                  pDescriptorCopies)
 {
-    printf("vkUpdateDescriptorSets: writes (%u), copies (%u) - \n", descriptorWriteCount, descriptorCopyCount);
-    for (uint32_t i = 0; i < descriptorWriteCount; ++i) {
-        auto& w = pDescriptorWrites[i];
-        printf("-    write: bind: %u, type: %u, set: 0x%llx\n", w.dstBinding, w.descriptorType, uint64_t(w.dstSet));
-    }
-    for (uint32_t i = 0; i < descriptorCopyCount; ++i) {
-        auto& w = pDescriptorCopies[i];
-        printf("-    copy: src_bind: %u, src_set: 0x%llx, dst_bind: %u, dst_set: 0x%llx\n", w.srcBinding, uint64_t(w.srcSet), w.dstBinding, uint64_t(w.dstSet));
+    if (test_debug(tinyvk::backend::descriptor_set)) {
+        printf("vkUpdateDescriptorSets: writes (%u), copies (%u) - \n", descriptorWriteCount, descriptorCopyCount);
+        for (uint32_t i = 0; i < descriptorWriteCount; ++i) {
+            auto& w = pDescriptorWrites[i];
+            printf("-    write: bind: %u, type: %u, set: 0x%lx\n", w.dstBinding, w.descriptorType, uint64_t(w.dstSet));
+        }
+        for (uint32_t i = 0; i < descriptorCopyCount; ++i) {
+            auto& w = pDescriptorCopies[i];
+            printf("-    copy: src_bind: %u, src_set: 0x%lx, dst_bind: %u, dst_set: 0x%lx\n", w.srcBinding, uint64_t(w.srcSet), w.dstBinding, uint64_t(w.dstSet));
+        }
     }
 }
 
@@ -646,6 +725,10 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateFramebuffer(
     const VkAllocationCallbacks*                pAllocator,
     VkFramebuffer*                              pFramebuffer)
 {
+    *pFramebuffer = tinyvk::backend::info.alloc.framebuffer.alloc(*pCreateInfo);
+    if (test_debug(tinyvk::backend::renderpass)) {
+        printf("vkCreateFramebuffer (0x%lx) - (%u) attachments\n", uint64_t(*pFramebuffer), pCreateInfo->attachmentCount);
+    }
     return VK_SUCCESS;
 }
 
@@ -654,7 +737,10 @@ VKAPI_ATTR void VKAPI_CALL vkDestroyFramebuffer(
     VkFramebuffer                               framebuffer,
     const VkAllocationCallbacks*                pAllocator)
 {
-
+    tinyvk::backend::info.alloc.framebuffer.free(framebuffer);
+    if (test_debug(tinyvk::backend::renderpass)) {
+        printf("vkDestroyFramebuffer (0x%lx)\n", uint64_t(framebuffer));
+    }
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL vkCreateRenderPass(
@@ -663,6 +749,11 @@ VKAPI_ATTR VkResult VKAPI_CALL vkCreateRenderPass(
     const VkAllocationCallbacks*                pAllocator,
     VkRenderPass*                               pRenderPass)
 {
+    *pRenderPass = tinyvk::backend::info.alloc.renderpass.alloc(*pCreateInfo);
+    if (test_debug(tinyvk::backend::renderpass)) {
+        printf("vkCreateRenderPass (0x%lx) - (%u) attachments, (%u) subpasses, (%u) dependencies\n",
+            uint64_t(*pRenderPass), pCreateInfo->attachmentCount, pCreateInfo->subpassCount, pCreateInfo->dependencyCount);
+    }
     return VK_SUCCESS;
 }
 
@@ -671,7 +762,10 @@ VKAPI_ATTR void VKAPI_CALL vkDestroyRenderPass(
     VkRenderPass                                renderPass,
     const VkAllocationCallbacks*                pAllocator)
 {
-
+    tinyvk::backend::info.alloc.renderpass.free(renderPass);
+    if (test_debug(tinyvk::backend::renderpass)) {
+        printf("vkDestroyRenderPass (0x%lx)\n", uint64_t(renderPass));
+    }
 }
 
 //endregion

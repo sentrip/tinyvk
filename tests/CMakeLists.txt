@@ -19,7 +19,8 @@ add_custom_command(TARGET test_tinyvk POST_BUILD
 
 add_executable(test_tinyvk_backend
     tests.cpp
-    test_backend_descriptor.cpp
+#    test_backend_descriptor.cpp
+    test_backend_renderpass.cpp
     )
 
 target_link_libraries(test_tinyvk_backend PRIVATE tinyvk_test)
