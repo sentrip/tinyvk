@@ -483,7 +483,7 @@ pipeline::compute_desc::compute_desc(
     stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     stage.module = shader;
     stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    stage.pName = nullptr;
+    stage.pName = "main";
     if (spec.pMapEntries)
         stage.pSpecializationInfo = spec.copy(*storage);
 }
@@ -565,7 +565,7 @@ pipeline::graphics_desc::add_stage(
     st = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
     st.stage = VkShaderStageFlagBits(stage);
     st.module = module;
-    st.pName = nullptr;
+    st.pName = "main";
     stageCount++;
 }
 
