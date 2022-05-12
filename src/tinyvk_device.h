@@ -45,6 +45,29 @@ enum device_features_t : u64 {
     FEATURE_SPARSE_RESIDENCY_BUFFER = 0x20000000,
     FEATURE_SPARSE_RESIDENCY_IMAGE2_D = 0x40000000,
     FEATURE_SPARSE_RESIDENCY_IMAGE3_D = 0x80000000,
+    FEATURE_VERTEX_STORE_AND_ATOMIC = 0x0000000100000000ull,
+    FEATURE_FRAGMENT_STORE_AND_ATOMIC = 0x0000000200000000ull,
+};
+
+
+enum validation_feature_enable_t: u32 {
+    VALIDATION_FEATURE_ENABLE_GPU_ASSISTED = 1u << 0,
+    VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT = 1u << 1,
+    VALIDATION_FEATURE_ENABLE_BEST_PRACTICES = 1u << 2,
+    VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF = 1u << 3,
+    VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION = 1u << 4,
+};
+
+
+enum validation_feature_disable_t: u32 {
+    VK_VALIDATION_FEATURE_DISABLE_ALL = 1u << 0,
+    VK_VALIDATION_FEATURE_DISABLE_SHADERS = 1u << 1,
+    VK_VALIDATION_FEATURE_DISABLE_THREAD_SAFETY = 1u << 2,
+    VK_VALIDATION_FEATURE_DISABLE_API_PARAMETERS = 1u << 3,
+    VK_VALIDATION_FEATURE_DISABLE_OBJECT_LIFETIMES = 1u << 4,
+    VK_VALIDATION_FEATURE_DISABLE_CORE_CHECKS = 1u << 5,
+    VK_VALIDATION_FEATURE_DISABLE_UNIQUE_HANDLES = 1u << 6,
+    VK_VALIDATION_FEATURE_DISABLE_SHADER_VALIDATION_CACHE = 1u << 7,
 };
 
 
@@ -76,6 +99,8 @@ struct extensions {
     span<const char* const> device{};
     span<const char* const> instance{};
     span<const char* const> validation_layers{};
+    validation_feature_enable_t  validation_enable{};
+    validation_feature_disable_t validation_disable{};
 
     NDC ibool device_extensions_supported(VkPhysicalDevice physical_device) const NEX;
     NDC ibool validation_layers_supported() const NEX;
@@ -312,6 +337,24 @@ instance::create(
     instance_info.enabledLayerCount = ext.validation_layers.size();
     instance_info.ppEnabledLayerNames = ext.validation_layers.data();
 
+    VkValidationFeatureEnableEXT enables[8] = {};
+    VkValidationFeatureDisableEXT disables[8] = {};
+    VkValidationFeaturesEXT fts{VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT};
+    if (u32(ext.validation_enable) || u32(ext.validation_disable)) {
+        u32 enable_count{}, disable_count{};
+        for (u32 i = 0; i < 8; ++i)
+            if (u32(ext.validation_enable) & (1u << i))
+                enables[++enable_count] = VkValidationFeatureEnableEXT(i);
+        for (u32 i = 0; i < 8; ++i)
+            if (u32(ext.validation_disable) & (1u << i))
+                disables[++disable_count] = VkValidationFeatureDisableEXT(i);
+        fts.enabledValidationFeatureCount = enable_count;
+        fts.disabledValidationFeatureCount = disable_count;
+        fts.pEnabledValidationFeatures = enables;
+        fts.pDisabledValidationFeatures = disables;
+        instance_info.pNext = &fts;
+    }
+
     vk_validate(vkCreateInstance(&instance_info, alloc, &inst.vk),
         "tinyvk::instance::create - Failed to create vulkan instance");
 
@@ -439,6 +482,8 @@ vk_physical_device_feature(
         case FEATURE_SAMPLER_ANISOTROPY: return features.samplerAnisotropy;
         case FEATURE_OCCLUSION_QUERY_PRECISE: return features.occlusionQueryPrecise;
         case FEATURE_PIPELINE_STATISTICS_QUERY: return features.pipelineStatisticsQuery;
+        case FEATURE_VERTEX_STORE_AND_ATOMIC: return features.vertexPipelineStoresAndAtomics;
+        case FEATURE_FRAGMENT_STORE_AND_ATOMIC: return features.fragmentStoresAndAtomics;
         case FEATURE_SHADER_UNIFORM_BUFFER_ARRAY_DYNAMIC_INDEXING: return features.shaderUniformBufferArrayDynamicIndexing;
         case FEATURE_SHADER_SAMPLED_IMAGE_ARRAY_DYNAMIC_INDEXING: return features.shaderSampledImageArrayDynamicIndexing;
         case FEATURE_SHADER_STORAGE_BUFFER_ARRAY_DYNAMIC_INDEXING: return features.shaderStorageBufferArrayDynamicIndexing;

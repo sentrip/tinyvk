@@ -70,7 +70,7 @@ static void
 write_file(span<const char> file_name, span<const char> data)
 {
     FILE *file = fopen(file_name.data(), "w");
-    fwrite(data.data(), 1, data.size(), file);
+    if (!data.empty()) fwrite(data.data(), 1, data.size(), file);
     fclose(file);
 }
 
@@ -252,7 +252,8 @@ ibool preprocess_shader_cpp(
 
     ibool found_hash = false;
     const char* begin = src_code.data();
-    while (!found_hash || *begin != '\n') { found_hash |= (*begin == '#'); ++begin; }
+    while (!found_hash && *begin != '\n') { found_hash |= (*begin == '#'); ++begin; }
+    if (!found_hash) begin = src_code.data();
     write_file(input_name, {begin, src_code.size() - (begin - src_code.data())});
 
     tinystd::small_string<512> log_name{};
