@@ -344,10 +344,10 @@ instance::create(
         u32 enable_count{}, disable_count{};
         for (u32 i = 0; i < 8; ++i)
             if (u32(ext.validation_enable) & (1u << i))
-                enables[++enable_count] = VkValidationFeatureEnableEXT(i);
+                enables[enable_count++] = VkValidationFeatureEnableEXT(i);
         for (u32 i = 0; i < 8; ++i)
             if (u32(ext.validation_disable) & (1u << i))
-                disables[++disable_count] = VkValidationFeatureDisableEXT(i);
+                disables[disable_count++] = VkValidationFeatureDisableEXT(i);
         fts.enabledValidationFeatureCount = enable_count;
         fts.disabledValidationFeatureCount = disable_count;
         fts.pEnabledValidationFeatures = enables;
