@@ -250,11 +250,20 @@ ibool preprocess_shader_cpp(
     tmp = tmp_name.inc();
     output_name.append(tmp.data(), tmp.size());
 
-    ibool found_hash = false;
-    const char* begin = src_code.data();
-    while (!found_hash && *begin != '\n') { found_hash |= (*begin == '#'); ++begin; }
-    if (!found_hash) begin = src_code.data();
-    write_file(input_name, {begin, src_code.size() - (begin - src_code.data())});
+    tassert(src_code[0] == '#' && "Shader source must begin with '#'");
+
+    // Get glsl header - e.g. #version 450, #extension ...
+    u32 header_size = 0;
+    while (header_size < src_code.size()) {
+        if (src_code[header_size] != '#') break;
+        if (header_size + 7 < src_code.size() && memcmp(src_code.data() + header_size + 1, "define", 6) == 0) break;
+        auto* newline = tinystd::find(src_code.data() + header_size, src_code.end(), '\n');
+        if (newline == src_code.end()) break;
+        while (newline < src_code.end() && (*newline == '\n' || *newline == '\t' || *newline == '\r' || *newline == ' '))
+            ++newline;
+        header_size = newline - src_code.data();
+    }
+    write_file(input_name, {src_code.data() + header_size, src_code.size() - header_size});
 
     tinystd::small_string<512> log_name{};
     log_name.append(input_name.data(), input_name.size());
@@ -279,16 +288,17 @@ ibool preprocess_shader_cpp(
         char buf[64000]{};
         FILE* file = fopen(output_name.data(), "rb");
         if (file) {
-            output.resize(begin - src_code.data());
-            for (auto* it = src_code.data(); it != begin; ++it) {
-                output[it - src_code.data()] = *it;
-            }
-            output.push_back('\n');
+            // Write header
+            output.resize(header_size);
+            memcpy(output.data(), src_code.data(), header_size);
+            // Write output
             while ((nread = fread(buf, 1, sizeof(buf), file)) > 0) {
                 const size_t i = output.size();
                 output.resize(i + nread);
                 tinystd::memcpy(output.data() + i, buf, nread);
             }
+            while (output.back() == '\n' || output.back() == '\r')
+                output.pop_back();
             fclose(file);
         }
     }

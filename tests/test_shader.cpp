@@ -39,12 +39,11 @@ TEST_CASE("Shader compilation - glslangValidator - files", "[tinyvk]")
 static constexpr const char* MACRO_SRC = R"(#version 450
 #define MACRO_FUNC(x, y) y y x x
 #define MACRO_FUNC2(x, y) MACRO_FUNC(y, x)
-MACRO_FUNC2(a, b)
-)";
+MACRO_FUNC2(a, b))";
 
 TEST_CASE("Shader preprocess - cpp", "[tinyvk]")
 {
     tinystd::stack_vector<char, 1024> out;
     tinyvk::preprocess_shader_cpp({MACRO_SRC, strlen(MACRO_SRC)}, out, {});
-    REQUIRE( memcmp(out.data(), "#version 450\na a b b\n", out.size()) == 0 );
+    REQUIRE( memcmp(out.data(), "#version 450\na a b b", out.size()) == 0 );
 }

@@ -148,11 +148,7 @@ TEST_CASE("Device setup/teardown", "[tinyvk]")
 {
     // Extensions
     small_vector<const char*> device_ext{}, instance_ext{}, validation{};
-#ifdef _MSC_VER
-    validation.push_back("VK_LAYER_LUNARG_standard_validation");
-#else
     validation.push_back("VK_LAYER_KHRONOS_validation");
-#endif
     instance_ext.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
     // Instance
