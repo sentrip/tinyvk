@@ -256,7 +256,13 @@ ibool preprocess_shader_cpp(
     u32 header_size = 0;
     while (header_size < src_code.size()) {
         if (src_code[header_size] != '#') break;
+        if (header_size + 3 < src_code.size() && memcmp(src_code.data() + header_size + 1, "if", 2) == 0) break;
+        if (header_size + 5 < src_code.size() && memcmp(src_code.data() + header_size + 1, "elif", 4) == 0) break;
+        if (header_size + 5 < src_code.size() && memcmp(src_code.data() + header_size + 1, "else", 4) == 0) break;
+        if (header_size + 6 < src_code.size() && memcmp(src_code.data() + header_size + 1, "endif", 5) == 0) break;
+        if (header_size + 6 < src_code.size() && memcmp(src_code.data() + header_size + 1, "undef", 5) == 0) break;
         if (header_size + 7 < src_code.size() && memcmp(src_code.data() + header_size + 1, "define", 6) == 0) break;
+        if (header_size + 8 < src_code.size() && memcmp(src_code.data() + header_size + 1, "include", 7) == 0) break;
         auto* newline = tinystd::find(src_code.data() + header_size, src_code.end(), '\n');
         if (newline == src_code.end()) break;
         while (newline < src_code.end() && (*newline == '\n' || *newline == '\t' || *newline == '\r' || *newline == ' '))

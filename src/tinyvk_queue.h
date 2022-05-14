@@ -77,7 +77,7 @@ struct queue_create_info {
 
     queue_index_t                           family_counts   [MAX_QUEUE_FAMILIES]{};
     fixed_vector<info, MAX_DEVICE_QUEUES>   queues          [MAX_QUEUE_COUNT]{};
-    float                                   priorities      [MAX_QUEUE_FAMILIES][MAX_DEVICE_QUEUES]{};
+    float                                   priorities      [MAX_DEVICE_QUEUES][MAX_QUEUE_COUNT]{};
     queue_index_t                           present_index{};
 
     explicit queue_create_info(
@@ -111,7 +111,7 @@ private:
 
 struct queue_collection {
     fixed_vector<VkQueue, MAX_DEVICE_QUEUES>    physical{};
-    queue_index_t                               physical_index  [MAX_QUEUE_COUNT][MAX_DEVICE_QUEUES]{};
+    queue_index_t                               physical_index  [MAX_DEVICE_QUEUES][MAX_QUEUE_COUNT]{};
     bitset<MAX_DEVICE_QUEUES>                   is_shared       [MAX_QUEUE_COUNT]{};
     queue_index_t                               count           [MAX_QUEUE_COUNT]{};
     queue_index_t                               dedicated_count [MAX_QUEUE_COUNT]{};
