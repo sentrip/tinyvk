@@ -28,7 +28,7 @@ struct shader_module : type_wrapper<shader_module, VkShaderModule> {
 
     static shader_module        create(
             VkDevice                device,
-            const shader_binary&    code,
+            span<const u32>         code,
             vk_alloc                alloc = {}) NEX;
 
     void                        destroy(
@@ -84,7 +84,7 @@ namespace tinyvk {
 shader_module
 shader_module::create(
         VkDevice device,
-        const shader_binary& code,
+        span<const u32> code,
         vk_alloc alloc) NEX
 {
     shader_module m;
