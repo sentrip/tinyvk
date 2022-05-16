@@ -618,8 +618,7 @@ pipeline::graphics_desc::add_vertex_attribute(
         for (u32 i = 0; i < st->vertexAttributeDescriptionCount; ++i) {
             auto& d = st->pVertexAttributeDescriptions[i];
             if (d.binding == binding && d.location < location) {
-                tassert(false && "TODO: Calculate size in bytes of vk format for automatic vertex input offset calculation");
-                offset += 0; // vk_format_size_bytes(d.format)
+                offset += vk_format_size_bytes(d.format);
             }
         }
     }

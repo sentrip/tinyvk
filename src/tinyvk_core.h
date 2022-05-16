@@ -242,6 +242,20 @@ constexpr const char* vk_result_name(VkResult r)
 }
 
 
+constexpr u32 vk_format_size_bytes(VkFormat format)
+{
+    switch (format) {
+        case VK_FORMAT_R32_SFLOAT               : return 4;
+        case VK_FORMAT_R32G32_SFLOAT            : return 8;
+        case VK_FORMAT_R32G32B32_SFLOAT         : return 12;
+        case VK_FORMAT_R32G32B32A32_SFLOAT      : return 16;
+        default:
+            tinystd::error("Unknown format: %u\n", u32(format));
+            tinystd::exit(1);
+            return 0;
+    }
+}
+
 template<typename... Args>
 void vk_check(VkResult r, const char* msg, Args&&... args)
 {
