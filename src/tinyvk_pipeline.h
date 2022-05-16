@@ -504,7 +504,7 @@ pipeline::graphics_desc::graphics_desc(
         derived base) NEX
 : VkGraphicsPipelineCreateInfo{}
 {
-    sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     this->layout = layout;
 
     tassert((!base.pipeline || base.index == -1u) && "tinyvk::pipeline::compute - Cannot provide both base pipeline and base index");
