@@ -220,6 +220,46 @@ compile_shader_glslangvalidator_files(
 
 //region Preprocess
 
+static span<const char> get_line(span<const char> data, size_t offset = 0)
+{
+    size_t line_end = offset;
+    while (line_end < data.size() && data[line_end] != '\n' && data[line_end] != '\r') ++line_end;
+    return {data.data() + offset, line_end - offset};
+}
+
+template<size_t N, size_t NP>
+static void shader_get_extensions(
+    span<const char>            src_code,
+    small_vector<char, N>&      header,
+    small_vector<char, NP>&     to_preprocess)
+{
+    u32 line_begin = 0;
+    while (line_begin < src_code.size()) {
+        auto line = get_line(src_code, line_begin);
+        line_begin = line.end() - src_code.data();
+        if (memcmp(line.data(), "#version", 8) == 0) {
+            header.resize(header.size() + line.size() + 1);
+            memcpy(header.end() - line.size() - 1, line.data(), line.size());
+            header.back() = '\n';
+        } else if (memcmp(line.data(), "#extension", 10) == 0) {
+            header.resize(header.size() + line.size() + 1);
+            memcpy(header.end() - line.size() - 1, line.data(), line.size());
+            header.back() = '\n';
+
+            to_preprocess.resize(to_preprocess.size() + line.size() + 1);
+            memcpy(to_preprocess.end() - line.size() - 1, "#define   ", 10);
+            memcpy(to_preprocess.end() - line.size() - 1 + 10, line.data() + 10, line.size() + 10);
+            to_preprocess.back() = '\n';
+        } else {
+            to_preprocess.resize(to_preprocess.size() + line.size() + 1);
+            memcpy(to_preprocess.end() - line.size() - 1, line.data(), line.size());
+            to_preprocess.back() = '\n';
+        }
+        while (src_code[line_begin] == '\n' || src_code[line_begin] == '\r') line_begin++;
+    }
+}
+
+
 ibool preprocess_shader_cpp(
     span<const char>            src_code,
     small_vector<char, 1024>&   output,
@@ -252,24 +292,10 @@ ibool preprocess_shader_cpp(
 
     tassert(src_code[0] == '#' && "Shader source must begin with '#'");
 
-    // Get glsl header - e.g. #version 450, #extension ...
-    u32 header_size = 0;
-    while (header_size < src_code.size()) {
-        if (src_code[header_size] != '#') break;
-        if (header_size + 3 < src_code.size() && memcmp(src_code.data() + header_size + 1, "if", 2) == 0) break;
-        if (header_size + 5 < src_code.size() && memcmp(src_code.data() + header_size + 1, "elif", 4) == 0) break;
-        if (header_size + 5 < src_code.size() && memcmp(src_code.data() + header_size + 1, "else", 4) == 0) break;
-        if (header_size + 6 < src_code.size() && memcmp(src_code.data() + header_size + 1, "endif", 5) == 0) break;
-        if (header_size + 6 < src_code.size() && memcmp(src_code.data() + header_size + 1, "undef", 5) == 0) break;
-        if (header_size + 7 < src_code.size() && memcmp(src_code.data() + header_size + 1, "define", 6) == 0) break;
-        if (header_size + 8 < src_code.size() && memcmp(src_code.data() + header_size + 1, "include", 7) == 0) break;
-        auto* newline = tinystd::find(src_code.data() + header_size, src_code.end(), '\n');
-        if (newline == src_code.end()) break;
-        while (newline < src_code.end() && (*newline == '\n' || *newline == '\t' || *newline == '\r' || *newline == ' '))
-            ++newline;
-        header_size = newline - src_code.data();
-    }
-    write_file(input_name, {src_code.data() + header_size, src_code.size() - header_size});
+    small_vector<char, 1024> header{};
+    small_vector<char, 16384> to_preprocess{};
+    shader_get_extensions(src_code, header, to_preprocess);
+    write_file(input_name, to_preprocess);
 
     tinystd::small_string<512> log_name{};
     log_name.append(input_name.data(), input_name.size());
@@ -295,8 +321,9 @@ ibool preprocess_shader_cpp(
         FILE* file = fopen(output_name.data(), "rb");
         if (file) {
             // Write header
-            output.resize(header_size);
-            memcpy(output.data(), src_code.data(), header_size);
+            output.resize(header.size());
+            memcpy(output.data(), header.data(), header.size());
+
             // Write output
             while ((nread = fread(buf, 1, sizeof(buf), file)) > 0) {
                 const size_t i = output.size();

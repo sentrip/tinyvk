@@ -47,3 +47,17 @@ TEST_CASE("Shader preprocess - cpp", "[tinyvk]")
     tinyvk::preprocess_shader_cpp({MACRO_SRC, strlen(MACRO_SRC)}, out, {});
     REQUIRE( memcmp(out.data(), "#version 450\na a b b", out.size()) == 0 );
 }
+
+
+static constexpr const char* DIRECTIVES_SRC = R"(#version 450
+#extension STUFF : require
+ab
+#extension THINGS : enable
+)";
+
+TEST_CASE("Shader preprocess directives - cpp", "[tinyvk]")
+{
+    tinystd::stack_vector<char, 1024> out;
+    tinyvk::preprocess_shader_cpp({DIRECTIVES_SRC, strlen(DIRECTIVES_SRC)}, out, {});
+    REQUIRE( memcmp(out.data(), "#version 450\n#extension STUFF : require\n#extension THINGS : enable\nab", out.size()) == 0 );
+}
