@@ -161,7 +161,7 @@ private:
 struct pipeline::blend_desc {
     enum Mask { RED = 1, GREEN = 2, BLUE = 4, ALPHA = 8, ALL = 15 };
     struct Mode {
-        VkBlendFactor src{};
+        VkBlendFactor src{VK_BLEND_FACTOR_ONE};
         VkBlendFactor dst{VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA};
         VkBlendOp     op{VK_BLEND_OP_ADD};
     };

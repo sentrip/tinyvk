@@ -562,6 +562,18 @@ device::create(
     create_info.enabledLayerCount = ext.validation_layers.size();
     create_info.ppEnabledLayerNames = ext.validation_layers.data();
 
+    VkPhysicalDeviceDescriptorIndexingFeatures descriptor_features{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES};
+    if (supported &
+        (FEATURE_SHADER_UNIFORM_BUFFER_ARRAY_DYNAMIC_INDEXING | FEATURE_SHADER_SAMPLED_IMAGE_ARRAY_DYNAMIC_INDEXING
+        | FEATURE_SHADER_STORAGE_BUFFER_ARRAY_DYNAMIC_INDEXING | FEATURE_SHADER_STORAGE_IMAGE_ARRAY_DYNAMIC_INDEXING))
+     {
+        descriptor_features.shaderUniformBufferArrayNonUniformIndexing = (supported & FEATURE_SHADER_UNIFORM_BUFFER_ARRAY_DYNAMIC_INDEXING) != 0;
+        descriptor_features.shaderSampledImageArrayNonUniformIndexing = (supported & FEATURE_SHADER_SAMPLED_IMAGE_ARRAY_DYNAMIC_INDEXING) != 0;
+        descriptor_features.shaderStorageBufferArrayNonUniformIndexing = (supported & FEATURE_SHADER_STORAGE_BUFFER_ARRAY_DYNAMIC_INDEXING) != 0;
+        descriptor_features.shaderStorageImageArrayNonUniformIndexing = (supported & FEATURE_SHADER_STORAGE_IMAGE_ARRAY_DYNAMIC_INDEXING) != 0;
+        create_info.pNext = &descriptor_features;
+    }
+
     vk_validate(vkCreateDevice(physical_device, &create_info, alloc, &d.vk),
         "tinyvk::device::create - Failed to create logical device");
 
