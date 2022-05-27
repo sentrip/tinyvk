@@ -8,7 +8,7 @@
 
 #include <cstring>
 #include <shaderc/shaderc.hpp>
-//#include <sp
+#include <spirv_cross/spirv_cross.hpp>
 
 namespace tinyvk {
 
@@ -344,6 +344,63 @@ ibool preprocess_shader_cpp(
     remove_file(output_name);
 
     return success;
+}
+
+//endregion
+
+//region reflect
+
+template<typename Func>
+static void spirv_iter_instructions(span<const u32> code, Func&& func)
+{
+     assert(code[0] == spv::MagicNumber);
+
+    const u32* instruction = code.data() + 5;
+    const u32* end = code.end();
+
+    for(;;) {
+        u32 op_code = instruction[0] & u32(UINT16_MAX);
+        u32 word_count = instruction[0] >> 16u;
+
+        if (!op_code)           break;
+        if (func(op_code, instruction - code.data() , word_count))
+            break;
+
+        assert(instruction + word_count <= end);
+        instruction += word_count;
+
+        if (instruction == end) break;
+        if (instruction > end)  break;
+    }
+}
+
+ibool reflect_shader_convert_const_array_to_spec_const(span<u32> binary)
+{
+    u32 results[1024]{};
+    u32 result_count{}, replace_count{};
+
+    spirv_iter_instructions(binary, [&](u32 op, u32 offset, u32 size){
+        if (op == spv::OpTypeArray || op == spv::OpTypeRuntimeArray) {
+            results[result_count++] = binary[offset + 1];
+        }
+        return false;
+    });
+
+    spirv_iter_instructions(binary, [&](u32 op, u32 offset, u32 size){
+        if (op == spv::OpConstantComposite) {
+            const u32 id = binary[offset + 1];
+            for (u32 i = 0; i < result_count; ++i) {
+                if (results[i] == id) {
+                    binary[offset] = spv::OpSpecConstantComposite | ((binary[offset] >> 16u) << 16u);
+                    replace_count++;
+                    break;
+                }
+            }
+        }
+        return replace_count == result_count;
+    });
+
+    return true;
 }
 
 //endregion

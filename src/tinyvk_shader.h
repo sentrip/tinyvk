@@ -70,6 +70,11 @@ preprocess_shader_cpp(
         small_vector<char, 1024>&   output,
         span<const shader_macro>    macros);
 
+
+ibool
+reflect_shader_convert_const_array_to_spec_const(
+        span<u32>                   binary);
+
 }
 
 #endif //TINYVK_SHADER_H

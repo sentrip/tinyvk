@@ -5,6 +5,7 @@
 #include "catch.hpp"
 
 #include <cstring>
+
 #include "tinyvk_shader.h"
 
 static constexpr const char* SRC = R"(
@@ -60,4 +61,23 @@ TEST_CASE("Shader preprocess directives - cpp", "[tinyvk]")
     tinystd::stack_vector<char, 1024> out;
     tinyvk::preprocess_shader_cpp({DIRECTIVES_SRC, strlen(DIRECTIVES_SRC)}, out, {});
     REQUIRE( memcmp(out.data(), "#version 450\n#extension STUFF : require\n#extension THINGS : enable\nab", out.size()) == 0 );
+}
+
+static constexpr const char* CONSTANT_TO_SPEC_CONSTANT_SRC = R"(#version 450
+
+layout(std430, binding = 0) buffer Buf { ivec4 data[]; } buf;
+
+const ivec4 DATA[2] = ivec4[2](
+    ivec4(1),
+    ivec4(2)
+);
+
+void main() {
+    buf.data[0] = DATA[0];
+})";
+
+TEST_CASE("Shader reflect convert constant array to specialization constant array", "[tinyvk]")
+{
+    auto binary = tinyvk::compile_shader_glslangvalidator(tinyvk::SHADER_COMPUTE, {CONSTANT_TO_SPEC_CONSTANT_SRC, strlen(CONSTANT_TO_SPEC_CONSTANT_SRC)});
+    tinyvk::reflect_shader_convert_const_array_to_spec_const(binary);
 }
