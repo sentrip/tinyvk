@@ -7,7 +7,7 @@
 #include <cstring>
 
 #include "tinyvk_shader.h"
-
+/*
 static constexpr const char* SRC = R"(
 #version 450
 void main() {}
@@ -62,22 +62,71 @@ TEST_CASE("Shader preprocess directives - cpp", "[tinyvk]")
     tinyvk::preprocess_shader_cpp({DIRECTIVES_SRC, strlen(DIRECTIVES_SRC)}, out, {});
     REQUIRE( memcmp(out.data(), "#version 450\n#extension STUFF : require\n#extension THINGS : enable\nab", out.size()) == 0 );
 }
-
+*/
 static constexpr const char* CONSTANT_TO_SPEC_CONSTANT_SRC = R"(#version 450
 
-layout(std430, binding = 0) buffer Buf { ivec4 data[]; } buf;
+struct X { uint v[2]; };
 
-const ivec4 DATA[2] = ivec4[2](
-    ivec4(1),
-    ivec4(2)
-);
+const X DATA = X(uint[2](1,2));
+layout(constant_id = 0) const uint DATA_ = 0;
+
+layout(constant_id = 1) const uint IDX = 0;
 
 void main() {
-    buf.data[0] = DATA[0];
+    uint x = DATA.v[IDX];
 })";
+
+
+static constexpr const char* CONSTANTS_SRC = R"(#version 450
+struct Tree {
+    uint log2dim[8];
+    uint total_log2dim[8];
+    uint levels;
+};
+
+const Tree trees[2] = {
+    {
+        {2,3,4,0,0,0,0,0},
+        {2,5,9,0,0,0,0,0},
+        3u
+    },
+    {
+        {1,2,3,0,0,0,0,0},
+        {1,3,6,0,0,0,0,0},
+        3u
+    }
+};
+
+void main()  {
+    uint x = (1u << (3u * trees[0].log2dim[1])) - 1u;
+    uint y = (1u << (3u * trees[1].log2dim[1])) - 1u;
+    uint z = x + y;
+}
+
+)";
 
 TEST_CASE("Shader reflect convert constant array to specialization constant array", "[tinyvk]")
 {
-    auto binary = tinyvk::compile_shader_glslangvalidator(tinyvk::SHADER_COMPUTE, {CONSTANT_TO_SPEC_CONSTANT_SRC, strlen(CONSTANT_TO_SPEC_CONSTANT_SRC)});
-    tinyvk::reflect_shader_convert_const_array_to_spec_const(binary);
+    auto binary = tinyvk::compile_shader_glslangvalidator(tinyvk::SHADER_COMPUTE, {CONSTANTS_SRC, strlen(CONSTANTS_SRC)});
+
+    FILE* f{};
+    fopen_s(&f, "comp.spv", "wb");
+    fwrite(binary.data(), 4u, binary.size(), f);
+    fclose(f);
+
+    system("C:\\VulkanSDK\\1.3.211.0\\Bin\\spirv-dis.exe comp.spv");
+    system("del comp.spv");
+
+//    printf("\n\n\n");
+//    fflush(stdout);
+
+//    const char* types[1]{"X"};
+//    const char* names[1]{"DATA_"};
+//    const auto size = tinyvk::reflect_shader_convert_consts_to_spec_consts(binary, {types, 1}, {names, 1});
+//
+//    fopen_s(&f, "comp.spv", "wb");
+//    fwrite(binary.data(), 4u, size, f);
+//    fclose(f);
+//
+//    system("C:\\VulkanSDK\\1.3.211.0\\Bin\\spirv-dis.exe comp.spv");
 }

@@ -350,6 +350,7 @@ ibool preprocess_shader_cpp(
 
 //region reflect
 
+/*
 template<typename Func>
 static void spirv_iter_instructions(span<const u32> code, Func&& func)
 {
@@ -374,34 +375,62 @@ static void spirv_iter_instructions(span<const u32> code, Func&& func)
     }
 }
 
-ibool reflect_shader_convert_const_array_to_spec_const(span<u32> binary)
-{
-    u32 results[1024]{};
-    u32 result_count{}, replace_count{};
+struct spirv_value {
+    const char* name{};
+    u32 id{};
+};
 
+u32 reflect_shader_convert_consts_to_spec_consts(span<u32> binary, span<const char*> type_names, span<const char*> spec_const_names)
+{
+    u32 value_count{};
+    spirv_value values[64]{};
+
+    auto find_value = [&](u32 id){ for (u32 i = 0; i < value_count; ++i) if (values[i].id == id) return i; return -1u; };
+    auto find_name = [&](const char* n, span<const char*> ns){ for (u32 i = 0; i < ns.size(); ++i) if (tinystd::streq(n, ns[i])) return i; return -1u; };
+
+    // Get all OpConstantComposite where the first argument is an id whose name is in given type names
     spirv_iter_instructions(binary, [&](u32 op, u32 offset, u32 size){
-        if (op == spv::OpTypeArray || op == spv::OpTypeRuntimeArray) {
-            results[result_count++] = binary[offset + 1];
+        if (op == spv::OpName) {
+            values[value_count++] = {(const char*)(binary.data() + offset + 2u), binary[offset + 1u]};
+        }
+        else if (op == spv::OpConstantComposite) {
+            const u32 first_arg = binary[offset + 1u];
+            const u32 vi = find_value(first_arg);
+            if (vi != -1u) {
+                const char* first_arg_name = values[vi].name;
+                const u32 ni = find_name(first_arg_name, type_names);
+                if (ni != -1u) {
+                    // add this op, it must be used for patching
+                    printf("CONST DEF %s\n", spec_const_names[ni]);
+                }
+            }
         }
         return false;
     });
 
+    // For all OpConstantComposites collected, get OpSpecConstant where the result is an id whose name is the corresponding spec const name for the input name
     spirv_iter_instructions(binary, [&](u32 op, u32 offset, u32 size){
-        if (op == spv::OpConstantComposite) {
-            const u32 id = binary[offset + 1];
-            for (u32 i = 0; i < result_count; ++i) {
-                if (results[i] == id) {
-                    binary[offset] = spv::OpSpecConstantComposite | ((binary[offset] >> 16u) << 16u);
-                    replace_count++;
-                    break;
+        if (op == spv::OpSpecConstant) {
+            const u32 vi = find_value(binary[offset + 2u]);
+            if (vi != -1u) {
+                const u32 ni = find_name(values[vi].name, spec_const_names);
+                if (ni != -1u) {
+                    // get collected OpConstantComposite that has the same name index
+                    // link collected OpConstantComposite to OpSpecConstant
+                    printf("SPEC DEF %s\n", spec_const_names[ni]);
                 }
             }
         }
-        return replace_count == result_count;
+        return false;
     });
 
-    return true;
+    // Modify OpConstantComposite -> OpSpecConstantComposite with new result being the spec const id
+
+    // For every occurrence of the OpConstantComposite result id, replace it with the spec const id
+
+    return binary.size();
 }
+*/
 
 //endregion
 
